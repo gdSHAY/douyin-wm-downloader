@@ -68,6 +68,24 @@ jobs:
           # 容器里没有安卓的 MediaMuxer，这个接口应当如实报告「不可用」而不是报错
           grep -q '"available"' /tmp/cap.json || { echo "接口返回异常，失败"; exit 1; }
 
+      - name: 探测 TikTok 可达性（境外出口参考）
+        # 这一条**不阻塞**构建：只用来回答「境外机房到底能不能直连 TikTok」。
+        # 注意 GitHub runner 与 Render 不是同一家机房（前者 Azure，后者 AWS），
+        # 结论只能当参考，不能当保证 —— 真结果以 Render 部署后的实测为准。
+        continue-on-error: true
+        run: |
+          echo "--- 从容器里探 TikTok（模拟境外出口）---"
+          docker run --rm multipldl:ci python -c "
+          import requests
+          ua = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+          for url in ['https://www.tiktok.com/', 'https://www.tiktok.com/api/']:
+              try:
+                  r = requests.get(url, timeout=15, headers=ua)
+                  print('%-34s -> HTTP %s  %d bytes' % (url, r.status_code, len(r.content)))
+              except Exception as exc:
+                  print('%-34s -> %s: %s' % (url, type(exc).__name__, str(exc)[:90]))
+          "
+
       - name: 清理
         if: always()
         run: docker rm -f smoke || true

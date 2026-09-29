@@ -7,6 +7,25 @@
 - **云端**：Docker 镜像部署到 Render，得到一个可点开的网址（本文件讲的就是它）
 - **本地**：`python server.py` 或打包成 exe / 安卓 APK
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gdSHAY/douyin-wm-downloader)
+
+> 仓库是**私有**的：点这个按钮后 Render 会先让你用 GitHub 登录、授权它读本仓库，
+> 然后它读 `render.yaml` 自动建服务。不想用按钮就走下面第二节的手动流程，效果一样。
+
+### 这个仓库已经自动验证过什么
+
+每次推送到 `main`，CI（`.github/workflows/docker-check.yml`）会真跑一遍并给出结论：
+
+| 验证项 | 说明 |
+| --- | --- |
+| Docker 镜像能构建 | `docker build` 成功，依赖全部装得上 |
+| **ffmpeg 在镜像里可用** | `ffmpeg -version` 有输出 ← **B站 出成片的前提** |
+| 服务能在容器里启动 | uvicorn 正常监听 `$PORT`，首页返回 200 |
+| 端口注入正确 | 首页里 `__SERVICE_PORT__` 已被替换成实际端口 |
+| B站 合流能力接口正常 | `/api/bili/mux/capability` 正常响应（容器里如实报「不可用」，桌面/网页用 ffmpeg） |
+
+也就是说：**「镜像能不能构建、B站 能不能合流」这两件最容易翻车的事，在你去点部署之前就已经验过了。**
+
 ---
 
 ## 一、为什么云端要用 Docker
@@ -99,7 +118,12 @@ INFO:     Uvicorn running on http://0.0.0.0:10000
 ### 关于 `TIKTOK_PROXY`
 
 TikTok 官方接口在**中国大陆的网络**里无法直连（DNS 能解析、TCP 443 超时）。
-但 Render 的机房在境外，**通常直连就能用**，这项留空即可。
+Render 的机房在境外，**理论上直连就能用**，这项留空即可。
+
+> ⚠️ **这是推断，还没在 Render 上实测过。** 原因是本机访问不到 Render 的出口网络，
+> 只能在 GitHub Actions 的境外 runner 上做近似验证（CI 日志里那步「探测 TikTok 可达性」）：
+> 实测能正常访问 `www.tiktok.com` 并拿到 200。但 runner 在 Azure、Render 在 AWS，
+> **机房不同，结论只能当参考**。请按第二节第 5 步实测一次。
 
 如果 TikTok 解析仍失败，说明该机房出口被挡了：
 
