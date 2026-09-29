@@ -12,6 +12,17 @@
 > 仓库是**私有**的：点这个按钮后 Render 会先让你用 GitHub 登录、授权它读本仓库，
 > 然后它读 `render.yaml` 自动建服务。不想用按钮就走下面第二节的手动流程，效果一样。
 
+**你现在要做的 5 件事**（代码侧已全部就绪，以下都需要在 Render 网站上手点）：
+
+1. 打开 <https://render.com> → **Get Started** → 用 **GitHub** 登录；
+2. 授权 Render 读这个仓库（可以只勾这一个）；
+3. 点上面那个 **Deploy to Render** 按钮（或控制台 **New + → Blueprint** 选仓库）；
+4. 点 **Apply**，等 **3–6 分钟**构建；
+5. 拿到 `https://xxx.onrender.com`，按[第二节第 5 步](#5-验证别只看首页)的表格逐项试。
+
+> 第 5 步里的 **B站「下载成片」** 和 **TikTok 解析** 是本次部署的两个核心目标，
+> 务必各试一次 —— 前者验证 ffmpeg 生效，后者验证境外直连生效。
+
 ### 这个仓库已经自动验证过什么
 
 每次推送到 `main`，CI（`.github/workflows/docker-check.yml`）会真跑一遍并给出结论：
