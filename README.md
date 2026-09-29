@@ -16,9 +16,15 @@
 
 1. 打开 <https://render.com> → **Get Started** → 用 **GitHub** 登录；
 2. 授权 Render 读这个仓库（可以只勾这一个）；
-3. 点上面那个 **Deploy to Render** 按钮（或控制台 **New + → Blueprint** 选仓库）；
-4. 点 **Apply**，等 **3–6 分钟**构建；
+3. 点上面那个 **Deploy to Render** 按钮；或自己走 **New + → Blueprint → 本仓库 Connect**；
+4. 填 Blueprint 名称、分支选 `main` → 点 **Deploy Blueprint**，等 **3–6 分钟**构建；
 5. 拿到 `https://xxx.onrender.com`，按[第二节第 5 步](#5-验证别只看首页)的表格逐项试。
+
+> 🚫 **入口别走错**：不要从 `New + → Web Service` 建，也不要理会
+> 「Create a new Service → Choose service」那个 8 卡片的页面（Static Sites / Web Services / …）。
+> 那是**逐项手填**模式 —— Render 看到仓库里有 `requirements.txt`，会把 **Language 猜成 Python**，
+> 走 buildpack 就装不了 ffmpeg → **B站 出不了成片**，正好废掉本次部署的核心目标。
+> 「Docker 构建」这件事已经写进 `render.yaml`，走 Blueprint 才会自动带上。详见第二节第 3 步。
 
 > 第 5 步里的 **B站「下载成片」** 和 **TikTok 解析** 是本次部署的两个核心目标，
 > 务必各试一次 —— 前者验证 ffmpeg 生效，后者验证境外直连生效。
@@ -87,10 +93,21 @@ Build & Deploy 下明确勾选了 **Docker builds**，Compute 里也列了 **Cus
 
 ### 3. 新建 Blueprint
 
+> ⚠️ **先确认入口对**：是控制台右上角 **New +** 菜单里的 **Blueprint**。
+> 如果你看到的界面是「Create a new Service → Choose service」那 8 个卡片
+> （Static Sites / Web Services / Private Services / Background Workers / Cron Jobs / …），
+> **说明已经走错了** —— 那是手填模式，里面**没有** Blueprint 卡片。退回去重新点 **New +**。
+
 - 控制台右上角 **New +** → **Blueprint**
-- 选本仓库 → **Connect**
-- Render 会读到仓库根目录的 `render.yaml`，自动填好服务名、区域、Docker 构建方式
-- 点 **Apply**（或 **Create Resources**）
+- 在仓库列表里点本仓库那一行的 **Connect**（私有仓库要先授权，见上一步）
+- 填 **Blueprint 名称**，**分支选 `main`**
+- Render 读到仓库根目录的 `render.yaml`，列出将要创建的资源（一个 `type: web` 服务）
+- 点 **Deploy Blueprint**（老版界面叫 **Apply** / **Create Resources**）
+
+服务名、区域 `singapore`、Docker 构建方式、Free 实例类型**都写在 `render.yaml` 里，不用手填**。
+
+> 万一 `render.yaml` 有问题，这一步会直接把错误列出来、**不会创建任何东西** ——
+> 比「建完服务再报错」好排查得多。
 
 ### 4. 等构建
 
