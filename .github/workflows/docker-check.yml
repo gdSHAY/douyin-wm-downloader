@@ -1,0 +1,73 @@
+# 验证 Docker 镜像真的能构建、ffmpeg 真的在、服务真的能起来。
+#
+# 为什么要有它
+# ------------
+# 开发机没装 Docker（WSL 里也只有 stub），所以 Dockerfile 的错在本地**根本测不出来**：
+#   要么等 Render 上构建失败（3~6 分钟，而且只有云端日志），
+#   要么等部署后访问 502 才发现。
+# 这个工作流把「构建 → ffmpeg 可用 → 服务启动 → 首页 200」整条链路在 CI 里跑一遍，
+# 把问题挡在推送之后、部署之前。
+#
+# 也和 Render 形成双保险：CI 通过 ≠ Render 一定通过（环境略有差异），
+# 但 CI 失败就一定别去点部署。
+
+name: 验证 Docker 镜像
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - "requirements.txt"
+      - "*.py"
+      - "static/**"
+      - ".github/workflows/docker-check.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 构建镜像
+        run: docker build -t multipldl:ci .
+
+      - name: 确认镜像里 ffmpeg 可用（B站 出成片的前提）
+        run: |
+          docker run --rm multipldl:ci ffmpeg -version | head -1
+
+      - name: 启动服务并探活
+        run: |
+          set -e
+          docker run -d --name smoke -e PORT=10000 -p 10000:10000 multipldl:ci
+          # 等它起来（uvicorn + 依赖 import 需要几秒）
+          for i in $(seq 1 30); do
+            if curl -fsS -o /tmp/idx.html http://127.0.0.1:10000/; then
+              echo "首页在第 $i 次探测时返回 200"
+              break
+            fi
+            sleep 1
+          done
+          echo "--- 容器日志 ---"
+          docker logs smoke
+          echo "--- 首页校验 ---"
+          test -s /tmp/idx.html || { echo "首页为空，失败"; exit 1; }
+          grep -q "__SERVICE_PORT__" /tmp/idx.html && { echo "端口占位符没被替换，失败"; exit 1; }
+          grep -q "10000" /tmp/idx.html || { echo "注入的端口不对，失败"; exit 1; }
+          echo "首页 $(wc -c < /tmp/idx.html) 字节，占位符已替换为 10000"
+
+      - name: 确认 B站 合流能力上报正常
+        run: |
+          set -e
+          curl -fsS http://127.0.0.1:10000/api/bili/mux/capability > /tmp/cap.json
+          cat /tmp/cap.json
+          echo
+          # 容器里没有安卓的 MediaMuxer，这个接口应当如实报告「不可用」而不是报错
+          grep -q '"available"' /tmp/cap.json || { echo "接口返回异常，失败"; exit 1; }
+
+      - name: 清理
+        if: always()
+        run: docker rm -f smoke || true
