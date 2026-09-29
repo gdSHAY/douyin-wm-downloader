@@ -1,0 +1,17 @@
+fastapi>=0.110
+uvicorn>=0.27
+requests>=2.31
+gmssl>=3.2.1
+
+# TikTok 兜底解析（可选）。
+# 主路径直接读 TikTok 网页接口，不依赖它；只有主路径拿不到档位时才会用它。
+# 保留它的原因：实测 yt-dlp 必须显式传桌面 Chrome UA 才能过 TikTok 的 JS challenge，
+# 且它给不出 fps —— 所以它只能当兜底，不能当主引擎。
+yt-dlp>=2025.1.1
+
+# 若代理是 SOCKS 协议（如 v2rayN 的 10808）才需要；Clash 的 7890 是混合端口，用 HTTP 即可，无需本项。
+# requests[socks]
+
+# 小红书解析需要：小红书对 TLS 指纹（JA3）有校验，curl_cffi 可 impersonate="chrome" 伪装握手特征。
+# 未安装时 xhs_parser 会自动降级到 requests（仍可能成功，但不保证）。
+curl_cffi>=0.7

@@ -1,0 +1,2106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>多平台无水印下载 · 抖音 / B站 / TikTok / 小红书</title>
+<style>
+  :root{
+    --bg:#f6f7f9;
+    --card:#ffffff;
+    --text:#1b1d21;
+    --text-2:#6b7280;
+    --line:#e8eaed;
+    --brand:#fe2c55;
+    --brand-grad:linear-gradient(135deg,#ff4d6a,#fe2c55);
+    --ok:#16a34a;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(16,24,40,.05), 0 8px 24px rgba(16,24,40,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:24px 16px 60px;
+  }
+  .wrap{max-width:880px;margin:0 auto;position:relative}
+
+  header{text-align:center;margin-bottom:20px}
+  .logo{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:26px;font-weight:800;letter-spacing:-.5px;
+  }
+  .logo .dot{
+    width:26px;height:26px;border-radius:8px;
+    background:var(--brand-grad);
+    display:inline-block;transition:background .2s;
+  }
+  .sub{color:var(--text-2);font-size:14px;margin-top:8px}
+
+  /* 平台切换横条 */
+  .tabs{display:flex;gap:8px;margin-bottom:14px}
+  .tab{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:11px 8px;font-size:14px;font-weight:600;color:var(--text-2);
+    cursor:pointer;transition:background .16s,color .16s,transform .1s,box-shadow .16s;
+    font-family:inherit;
+  }
+  .tab:active{transform:scale(.985)}
+  .tab .dot{width:9px;height:9px;border-radius:50%;background:currentColor;opacity:.35;display:block;transition:opacity .16s}
+  .tab:hover{background:#fafbfc;color:var(--text)}
+  .tab.active{background:var(--tab-color);color:#fff;border-color:transparent;box-shadow:var(--shadow)}
+  .tab.active .dot{opacity:1;background:#fff}
+  .tab.disabled{cursor:not-allowed;opacity:.62}
+  .tab.disabled:hover{background:var(--card);color:var(--text-2)}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px;margin-bottom:16px;
+  }
+
+  textarea{
+    width:100%;min-height:118px;resize:vertical;
+    border:1px solid var(--line);border-radius:10px;padding:14px;
+    font-size:15px;line-height:1.6;font-family:inherit;color:var(--text);
+    background:#fbfbfc;outline:none;transition:border-color .15s, background .15s;
+  }
+  textarea:focus{border-color:var(--brand);background:#fff}
+  textarea::placeholder{color:#9aa1ab}
+
+  .row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  button{
+    font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;
+    border:none;border-radius:10px;padding:12px 22px;transition:transform .1s, opacity .15s;
+  }
+  button:active{transform:scale(.98)}
+  .btn-primary{background:var(--brand);color:#fff;flex:1;min-width:150px}
+  .btn-primary:hover{opacity:.92}
+  .btn-primary:disabled{opacity:.55;cursor:not-allowed}
+  .btn-ghost{background:#f1f2f4;color:var(--text-2)}
+  .btn-ghost:hover{background:#e8eaed}
+
+  .hint{font-size:12.5px;color:var(--text-2);margin-top:10px;line-height:1.6}
+
+  .notice{
+    background:#fffbeb;border:1px solid #fde68a;color:#92400e;
+    font-size:12.5px;padding:9px 12px;border-radius:9px;margin-bottom:12px;line-height:1.65;
+  }
+  .notice.warn{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+  .notice code{
+    background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;
+    font-size:11.5px;word-break:break-all;
+  }
+
+  /* 结果区 */
+  #result{display:none}
+  .result-grid{display:flex;gap:18px;flex-wrap:wrap}
+  .media{flex:0 0 220px;max-width:220px}
+  .media video,.media img{
+    width:100%;border-radius:12px;background:#000;display:block;object-fit:cover;
+  }
+  .cover-wrap{position:relative}
+  .cover-wrap .badge-live{
+    position:absolute;left:6px;top:6px;background:rgba(0,0,0,.66);color:#fff;
+    font-size:10.5px;font-weight:600;padding:3px 7px;border-radius:6px;letter-spacing:.3px;
+  }
+  .info{flex:1;min-width:260px}
+  .title{font-size:17px;font-weight:700;line-height:1.5;margin:0 0 10px;word-break:break-word}
+  .author{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .author img{width:32px;height:32px;border-radius:50%;object-fit:cover;background:#eee}
+  .author span{font-size:14px;color:var(--text-2);font-weight:500}
+  .meta{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--text-2);margin-bottom:14px}
+  .meta b{color:var(--text);font-weight:600}
+
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+
+  /* 清晰度 / 分P 选择 */
+  .quality{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .quality label{font-size:13px;color:var(--text-2);font-weight:600;flex:0 0 auto}
+  .quality select{
+    font-family:inherit;font-size:14px;padding:8px 12px;border-radius:9px;
+    border:1px solid var(--line);background:#fbfbfc;color:var(--text);cursor:pointer;
+    outline:none;max-width:100%;flex:1;min-width:0;
+  }
+  .quality select:focus{border-color:var(--brand)}
+  .tag-hd{
+    font-size:11px;font-weight:700;color:#fff;background:var(--brand-grad);
+    padding:2px 7px;border-radius:5px;flex:0 0 auto;
+  }
+  .tag-fallback{font-size:11px;color:var(--text-2);background:#f1f2f4;padding:2px 7px;border-radius:5px;flex:0 0 auto}
+  .tag-warn{font-size:11px;font-weight:700;color:#b91c1c;background:#fee2e2;padding:2px 7px;border-radius:5px;flex:0 0 auto}
+  /* 本机合流（安卓 MediaExtractor+MediaMuxer）的进度块：合流要跑几十秒到几分钟，
+     只改按钮文字太粗糙，给一条进度条 + 一行说明，并把「自动降档」的原因常驻显示。 */
+  .mux-note{margin-top:8px;font-size:12px;line-height:1.6;color:var(--text-2);background:#f7f8fa;border:1px solid #e8eaee;border-radius:8px;padding:8px 10px}
+  .mux-note.warn{color:#92400e;background:#fffbeb;border-color:#fde68a}
+  .mux-bar{height:6px;border-radius:3px;background:#e6e8ec;overflow:hidden;margin-bottom:6px}
+  .mux-bar > i{display:block;height:100%;width:0;background:#1b1d21;transition:width .3s ease}
+  .btn-dl{
+    background:var(--brand-grad);color:#fff;
+    padding:11px 20px;border-radius:10px;font-size:14.5px;font-weight:600;
+    text-decoration:none;display:inline-flex;align-items:center;gap:6px;
+  }
+  .btn-dl:hover{opacity:.92}
+  .btn-dl.sec{background:#1b1d21}
+  .btn-dl.gray{background:#f1f2f4;color:var(--text-2)}
+  .btn-dl.disabled{opacity:.5;cursor:not-allowed}
+
+  .badge{
+    display:inline-block;background:rgba(22,163,74,.1);color:var(--ok);
+    font-size:12px;font-weight:600;padding:3px 8px;border-radius:6px;margin-left:6px;
+  }
+  .badge.plat{background:rgba(251,114,153,.14);color:#c2315c}
+  /* TikTok 徽标用自家黑白配色，与 B站 的粉色区分开 */
+  .badge.plat.tt{background:rgba(1,1,1,.08);color:#111}
+  /* 小红书徽标用自家红 */
+  .badge.plat.xhs{background:rgba(255,36,66,.12);color:#d81b39}
+  .sub-author{margin-left:8px;color:var(--text-2);font-size:12px}
+
+  /* 图集 */
+  .imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:14px}
+  .imgs figure{margin:0;position:relative}
+  .imgs img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:10px;background:#eee;display:block}
+  .imgs .dls{
+    position:absolute;right:6px;bottom:6px;display:flex;gap:5px;
+  }
+  .imgs .dls a{
+    background:rgba(0,0,0,.62);color:#fff;font-size:11px;
+    padding:4px 8px;border-radius:6px;text-decoration:none;
+  }
+  .imgs .dls a.live{background:rgba(37,99,235,.88)}
+  .imgs .tag-nw{
+    position:absolute;left:6px;top:6px;background:rgba(22,163,74,.86);color:#fff;
+    font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;letter-spacing:.3px;
+  }
+  .imgs .tag-live{
+    position:absolute;right:6px;top:6px;background:rgba(37,99,235,.88);color:#fff;
+    font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;letter-spacing:.3px;
+  }
+  .fig-meta{font-size:12.5px;color:var(--text-2);margin-top:14px}
+  .fig-meta .hi{color:#2563eb;font-weight:600}
+
+  .loading{display:none;text-align:center;padding:26px 0;color:var(--text-2);font-size:14px}
+  .spinner{
+    width:22px;height:22px;border:2.5px solid #e8eaed;border-top-color:var(--brand);
+    border-radius:50%;margin:0 auto 10px;animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .error{
+    display:none;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;
+    padding:12px 14px;border-radius:10px;font-size:14px;margin-bottom:16px;line-height:1.6;
+  }
+
+  .history{margin-top:6px}
+  .history-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .history-head h3{font-size:13px;color:var(--text-2);margin:0;font-weight:600}
+  .btn-mini{
+    font-size:12px;font-weight:600;padding:5px 10px;border-radius:7px;
+    background:#f1f2f4;color:var(--text-2);
+  }
+  .btn-mini:hover{background:#e8eaed}
+  .btn-mini.danger{background:#fee2e2;color:#b91c1c}
+  .btn-mini.danger:hover{background:#fecaca}
+  .history-item{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding:9px 12px;border-radius:9px;background:#fafbfc;border:1px solid var(--line);
+    margin-bottom:7px;font-size:13.5px;cursor:pointer;
+  }
+  .history-item:hover{background:#f2f4f6}
+  .history-item > span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hi-right{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+  .hi-right small{color:#9aa1ab}
+  .del{
+    background:transparent;color:#9aa1ab;font-size:17px;font-weight:400;line-height:1;
+    padding:3px 7px;border-radius:6px;
+  }
+  .del:hover{background:#fee2e2;color:#dc2626}
+
+  footer{text-align:center;color:#9aa1ab;font-size:12px;line-height:1.8;margin-top:26px}
+
+  /* ---------------- 账号设置入口 + 弹窗 ---------------- */
+  .btn-settings{
+    position:absolute;right:0;top:0;
+    display:inline-flex;align-items:center;gap:7px;
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:8px 13px;font-size:13px;font-weight:600;color:var(--text-2);
+    box-shadow:var(--shadow);transition:background .15s,color .15s,border-color .15s;
+  }
+  .btn-settings:hover{background:#fafbfc;color:var(--text);border-color:#dcdfe4}
+  .btn-settings .st{width:7px;height:7px;border-radius:50%;background:#c9ced6;display:block;flex:0 0 auto}
+  .btn-settings.on{color:#15803d;border-color:#bbf7d0;background:#f0fdf4}
+  .btn-settings.on .st{background:var(--ok)}
+
+  .modal{
+    position:fixed;inset:0;z-index:60;display:none;
+    background:rgba(16,24,40,.42);overflow:auto;
+    align-items:flex-start;justify-content:center;padding:38px 16px;
+  }
+  .modal.show{display:flex}
+  .modal-box{
+    background:var(--card);border-radius:16px;width:100%;max-width:640px;
+    box-shadow:0 20px 60px rgba(16,24,40,.24);
+  }
+  .modal-head{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:15px 18px;border-bottom:1px solid var(--line);
+  }
+  .modal-head h3{margin:0;font-size:16px;font-weight:700}
+  .modal-x{background:none;padding:4px 8px;font-size:15px;line-height:1;color:#9aa1ab}
+  .modal-x:hover{color:var(--text)}
+  .modal-body{padding:16px 18px}
+  .modal-foot{
+    display:flex;gap:9px;flex-wrap:wrap;
+    padding:13px 18px;border-top:1px solid var(--line);background:#fcfcfd;
+  }
+  .modal-foot button{font-size:14px;padding:10px 16px}
+  .modal-foot .btn-primary{flex:0 0 auto;min-width:0}
+  .modal-foot .spacer{flex:1}
+
+  .cfg-status{
+    font-size:12.5px;line-height:1.75;color:var(--text-2);
+    background:#fbfbfc;border:1px solid var(--line);border-radius:10px;padding:11px 13px;
+  }
+  .cfg-status b{color:var(--text);font-weight:600}
+  .cfg-status code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;font-size:11.5px;word-break:break-all}
+  .cfg-label{display:block;font-size:13px;font-weight:600;margin:15px 0 7px}
+  #cfgText{
+    min-height:152px;font-size:12.5px;line-height:1.55;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;
+  }
+  .cfg-msg{
+    display:none;font-size:12.5px;line-height:1.65;margin-top:11px;
+    padding:9px 12px;border-radius:9px;
+  }
+  .cfg-msg.show{display:block}
+  .cfg-msg.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d}
+  .cfg-msg.err{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c}
+  .cfg-msg.warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+  .cfg-help{margin-top:15px;font-size:12.5px;color:var(--text-2);line-height:1.85}
+  .cfg-help summary{cursor:pointer;font-weight:600;color:var(--text);outline:none}
+  .cfg-help ol{margin:9px 0 0;padding-left:20px}
+  .cfg-help code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;font-size:11.5px}
+
+  /* 设置弹窗内的分段切换（B站 账号 / TikTok 代理） */
+  .cfg-seg{display:flex;gap:7px;padding:13px 18px 0}
+  .cfg-seg .seg{
+    flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    background:var(--card);border:1px solid var(--line);border-radius:9px;
+    padding:9px 10px;font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s;
+  }
+  .cfg-seg .seg:hover{background:#fafbfc;color:var(--text)}
+  .cfg-seg .seg.active{background:#111;border-color:#111;color:#fff}
+  .cfg-seg .seg .st{width:7px;height:7px;border-radius:50%;background:#c9ced6;display:block;flex:0 0 auto}
+  .cfg-seg .seg .st.on{background:#22c55e}
+  #ttProxy{
+    min-height:0;font-size:13px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;
+  }
+  .modal-foot .foot-group{display:flex;gap:9px;flex-wrap:wrap}
+
+  @media (max-width:560px){
+    .media{flex:1 1 100%;max-width:100%}
+    .btn-primary{width:100%}
+    .logo{font-size:21px}
+    .tab{font-size:13px;padding:10px 6px}
+    header{padding-top:42px}
+    .btn-settings{font-size:12px;padding:7px 11px}
+    .modal{padding:16px 10px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <button class="btn-settings" id="btnSettings" title="B站 登录 Cookie / TikTok 代理">
+    <span class="st"></span>设置
+  </button>
+
+  <header>
+    <div class="logo"><span class="dot"></span>多平台无水印下载</div>
+    <div class="sub">粘贴链接自动识别平台 · 一键解析无水印视频 / 高清图集</div>
+  </header>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-platform="douyin"><span class="dot"></span>抖音</button>
+    <button class="tab" data-platform="bilibili"><span class="dot"></span>B站</button>
+    <button class="tab" data-platform="tiktok"><span class="dot"></span>TikTok</button>
+    <button class="tab" data-platform="xiaohongshu"><span class="dot"></span>小红书</button>
+  </div>
+
+  <div class="card">
+    <textarea id="input"></textarea>
+    <div class="row">
+      <button class="btn-primary" id="btnParse">开始解析</button>
+      <button class="btn-ghost" id="btnClear">清空</button>
+      <button class="btn-ghost" id="btnDemo">填入示例</button>
+    </div>
+    <div class="loading" id="loading"><div class="spinner"></div>正在解析，请稍候…</div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="error" id="error"></div>
+
+  <div class="card" id="result">
+    <div class="result-grid">
+      <div class="media" id="media"></div>
+      <div class="info">
+        <p class="title" id="title"></p>
+        <div class="author" id="author"></div>
+        <div class="meta" id="meta"></div>
+        <div id="qualityBox"></div>
+        <div class="actions" id="actions"></div>
+      </div>
+    </div>
+    <div id="imgsBox"></div>
+  </div>
+
+  <div class="card history" id="historyCard" style="display:none">
+    <div class="history-head">
+      <h3 id="historyTitle">最近解析</h3>
+      <button class="btn-mini" id="btnClearHistory">清空全部</button>
+    </div>
+    <div id="history"></div>
+  </div>
+
+  <footer>
+    视频与图片版权归原作者及平台所有，本工具仅供个人学习与技术交流使用。<br>
+    请在下载后 24 小时内删除，勿用于任何商业或侵权用途。
+  </footer>
+
+</div>
+
+<!-- ============ 设置：B站 账号（SESSDATA/cookies）与 TikTok 代理 ============ -->
+<div class="modal" id="settingsModal">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-label="设置">
+    <div class="modal-head">
+      <h3>设置</h3>
+      <button class="modal-x" id="btnCfgX" title="关闭">✕</button>
+    </div>
+
+    <div class="cfg-seg" id="cfgSeg">
+      <button class="seg active" data-seg="bili"><span class="st" id="segDotBili"></span>B站 账号</button>
+      <button class="seg" data-seg="tiktok"><span class="st" id="segDotTt"></span>TikTok 代理</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="cfg-pane" id="paneBili">
+      <div class="cfg-status" id="cfgStatus">正在读取当前配置…</div>
+
+      <label class="cfg-label" for="cfgText">粘贴 Cookie</label>
+      <textarea id="cfgText" spellcheck="false" autocomplete="off"
+        placeholder="把下面任意一种内容整段粘进来，然后点「保存并验证」：
+
+① 插件「Get cookies.txt LOCALLY」导出的 cookies.txt 全文（推荐，最省事）
+② SESSDATA=xxxxxxxx%2C1799735106%2C2b520%2A...
+③ 请求头形式：SESSDATA=xxx; bili_jct=yyy; DedeUserID=123
+④ 光秃秃的一个 SESSDATA 值"></textarea>
+
+      <div class="cfg-msg" id="cfgMsg"></div>
+
+      <details class="cfg-help">
+        <summary>怎么拿到这份 Cookie？（点开看 3 步）</summary>
+        <ol>
+          <li>用浏览器打开 <code>bilibili.com</code>，<b>确认已登录</b>。</li>
+          <li>装一个 Cookie 导出插件（如 <b>Get cookies.txt LOCALLY</b>），在 B站 页面点插件 → 导出/复制。</li>
+          <li>把导出内容整段粘到上面的框里 → 点「保存并验证」。</li>
+        </ol>
+        <p style="margin:9px 0 0">
+          没有插件也行：<code>F12</code> → <b>Application</b>（应用/存储）→ 左侧 <b>Cookies</b> →
+          <code>https://www.bilibili.com</code> → 找到 <b>SESSDATA</b>，复制 <b>Value</b> 列。
+        </p>
+        <p style="margin:9px 0 0">
+          ⚠️ 别从 <b>Network</b>（网络）面板的请求头里复制 —— 那里的逗号已被编码成 <code>%2C</code>，
+          是新手最常踩的坑（本工具虽会自动还原，但仍建议走上面两条正规路径）。
+        </p>
+        <p style="margin:9px 0 0">
+          🔒 Cookie 等同于账号登录态，仅保存在本机 <code>bili_config.json</code>（已加入
+          <code>.gitignore</code>）。本工具只把它用于向 B站 请求该账号有权观看的清晰度，不外传。
+        </p>
+      </details>
+      </div><!-- /paneBili -->
+
+      <div class="cfg-pane" id="paneTiktok" style="display:none">
+        <div class="cfg-status" id="ttStatus">正在读取代理状态…</div>
+
+        <label class="cfg-label" for="ttProxy">代理地址</label>
+        <input id="ttProxy" type="text" spellcheck="false" autocomplete="off"
+          placeholder="http://127.0.0.1:7890">
+
+        <div class="cfg-msg" id="ttMsg"></div>
+
+        <details class="cfg-help">
+          <summary>什么情况下要填代理？（点开看）</summary>
+          <p style="margin:9px 0 0">
+            分两种部署形态，别一概而论 —— 填错方向会白折腾：
+          </p>
+          <p style="margin:9px 0 0">
+            <b>① 跑在你自己电脑上（大陆网络）</b> —— TikTok 在中国大陆<b>无法直连</b>
+            （实测：DNS 能解析出 IP，但 TCP 443 直接超时），不挂代理就取不到任何数据。
+            这不是工具的缺陷，任何下载器都一样。
+          </p>
+          <p style="margin:9px 0 0">
+            <b>② 部署在境外服务器（如 Render / 海外 VPS）</b> —— 通常<b>直连即可</b>，
+            代理<b>留空</b>。若解析仍失败，说明该机房出口被 TikTok 拦了：换个机房区域，
+            或填一个<b>公网可达</b>的代理地址（别写 <code>127.0.0.1</code>，
+            那在服务器上指的是它自己，必然连不通）。
+          </p>
+          <p style="margin:9px 0 0">
+            最常见的做法：开着 Clash / FlClash / v2rayN，<b>不用手填</b> —— 本工具会自动探测
+            <code>7890</code>、<code>7897</code>、<code>10809</code> 等常见端口，并实测能否真的连上 TikTok。
+          </p>
+          <p style="margin:9px 0 0">
+            ⚠ 如果你用的是 <b>SOCKS</b> 端口（如 v2rayN 的 10808），当前 Python 环境没装 PySocks，
+            会直接报错。改用 HTTP 端口即可（Clash 的 7890 是混合端口，直接写
+            <code>http://127.0.0.1:7890</code>）；或执行 <code>pip install requests[socks]</code> 后重启服务。
+          </p>
+          <p style="margin:9px 0 0">
+            🔒 代理地址只写在本机 <code>tiktok_config.json</code>（已加入 <code>.gitignore</code>），
+            不包含任何账号信息，不会外传。
+          </p>
+        </details>
+      </div><!-- /paneTiktok -->
+    </div>
+
+    <div class="modal-foot">
+      <div class="foot-group" id="footBili">
+        <button class="btn-primary" id="btnCfgSave">保存并验证</button>
+        <button class="btn-ghost" id="btnCfgForce" style="display:none">仍然保存</button>
+        <button class="btn-ghost" id="btnCfgClear">清除已保存</button>
+      </div>
+      <div class="foot-group" id="footTt" style="display:none">
+        <button class="btn-primary" id="btnTtSave">保存并检测</button>
+        <button class="btn-ghost" id="btnTtClear">清除代理</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn-ghost" id="btnCfgClose">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const input = $('input'), btnParse = $('btnParse'), btnClear = $('btnClear'), btnDemo = $('btnDemo');
+const loading = $('loading'), errorBox = $('error'), result = $('result');
+
+/* 后端地址自适应。
+   服务端渲染页面时会把 __SERVICE_PORT__ 替换成**真实端口** —— 端口被占用时会自动顺延，
+   把 8787 写死就会指向错误地址。三种情况都要覆盖：
+     1) 从服务本身打开（同源）        -> 相对路径，API_BASE = ''
+     2) 本机其它端口（编辑器预览等）  -> 跨源，指向 http://127.0.0.1:<真实端口>
+        （后端已放行本机来源的 CORS）
+     3) 直接双击磁盘上的 index.html   -> 占位符没被替换，回退到 8787
+   判据用 **hostname** 而不是 location.port（2026-09-30 改）：
+   线上部署不一定跑在 443 —— 可能是自建域名配非标端口（https://x.example.com:8443），
+   也可能是经反向代理 / 内网 IP 以别的端口访问（http://192.168.1.5:8080）。
+   这些情况下 location.port ≠ 后端端口，旧判据 `!location.port || location.port === _PORT`
+   会把它们统统误判成「本机」，于是接口全指向 http://127.0.0.1:<端口> ——
+   而那个地址在访问者机器上并不是这台服务器，表现为**页面能正常打开、所有功能都失败**。
+   （Render 默认给 443，不会踩到；这是换域名 / 换访问方式时的防御。
+   旧判据只在「非本机 + 端口不等于后端端口」时出错，同端口场景它本来是对的。）
+   现在只有确实是本机（file:// 或 localhost / 127.0.0.1 / ::1 / 0.0.0.0）才回退到 127.0.0.1，
+   其余一律相对路径 —— 线上换什么域名、什么端口都不会指错。 */
+const SERVICE_PORT = '__SERVICE_PORT__';
+const _PORT = /^\d+$/.test(SERVICE_PORT) ? SERVICE_PORT : '8787';
+const _IS_LOCAL = location.protocol === 'file:' ||
+  ['localhost', '127.0.0.1', '0.0.0.0', '[::1]', '::1'].includes(location.hostname);
+const API_BASE = (_IS_LOCAL && location.port !== _PORT) ? 'http://127.0.0.1:' + _PORT : '';
+
+/* ---------------- 平台定义 ---------------- */
+const PLATFORMS = {
+  douyin: {
+    name: '抖音',
+    color: '#fe2c55',
+    grad: 'linear-gradient(135deg,#ff4d6a,#fe2c55)',
+    placeholder: '打开抖音App → 分享 → 复制链接，把整段文案粘贴到这里\n例如：7.89 gAh:/ 复制打开抖音，看看【xxx的作品】# xxx  https://v.douyin.com/xxxxx/',
+    hint: '支持分享短链（v.douyin.com）、网页长链（douyin.com/video/）、图集链接（douyin.com/note/）以及混合了中文口令的整段文案。',
+    demo: '2.84 nqe:/ 骑白马的也可以是公主%百万转场变身https://v.douyin.com/L4FJNR3/ 复制此链接，打开Dou音搜索，直接观看视频!',
+    empty: '请先粘贴抖音分享链接'
+  },
+  bilibili: {
+    name: 'B站',
+    color: '#fb7299',
+    grad: 'linear-gradient(135deg,#fc9db9,#fb7299)',
+    placeholder: '粘贴 B站 视频链接，支持 BV 号 / av 号 / b23.tv 短链\n例如：https://www.bilibili.com/video/BV1cSec6tEux/ 或 BV1cSec6tEux',
+    hint: '支持 BV 号、av 号、b23.tv 短链与带 ?p= 分P参数的链接。清晰度取决于账号：未登录约 480P，配置 SESSDATA 后可到 1080P（大会员可到 4K）。',
+    demo: 'https://www.bilibili.com/video/BV1cSec6tEux/',
+    empty: '请先粘贴 B站 视频链接或 BV 号'
+  },
+  tiktok: {
+    name: 'TikTok',
+    color: '#010101',
+    grad: 'linear-gradient(135deg,#25F4EE,#010101 55%,#FE2C55)',
+    placeholder: '粘贴 TikTok 视频链接，支持分享短链 / 完整链接 / 视频 id\n例如：https://www.tiktok.com/t/ZP8T8vjvf/  或  https://www.tiktok.com/@user/video/7684146981899390228',
+    hint: 'TikTok 官方接口在中国大陆无法直连：跑在大陆网络时必须走代理（右上角「⚙ 设置 → TikTok 代理」填写，或开着 Clash / FlClash，默认 7890，本工具会自动探测）。若本服务部署在境外（如 Render），通常直连即可、无需代理。档位按「分辨率 → 帧率 → 码率」排序，自动选中最高画质。',
+    demo: 'https://www.tiktok.com/t/ZP8T8vjvf/',
+    empty: '请先粘贴 TikTok 视频链接'
+  },
+  xiaohongshu: {
+    name: '小红书',
+    color: '#ff2442',
+    grad: 'linear-gradient(135deg,#ff5c72,#ff2442)',
+    placeholder: '打开小红书App → 笔记右上角「分享」→「复制链接」，把整段文案粘贴到这里\n例如：79 【苏州探店】 😆 http://xhslink.com/a/xxxxx，复制本条信息，打开【小红书】App查看精彩内容！',
+    hint: '小红书必须带 xsec_token 才能取到数据（平台限制，无法绕过），所以请用 App 里「分享 → 复制链接」得到的链接，别手动删参数。支持笔记视频（无水印）、图文（最高清原图）、动图（Live Photo，静态图 + 动态视频）。',
+    demo: '',
+    demoHint: '小红书没有通用示例链接：每条笔记的 xsec_token 都是独有的、且会过期，所以必须用你自己刚复制的那条链接。请在 App 里打开笔记 → 右上角「分享」→「复制链接」。',
+    empty: '请先粘贴小红书分享链接'
+  }
+};
+
+/* 与后端一致的平台识别规则（顺序即优先级） */
+const PLATFORM_RULES = [
+  ['bilibili', /(bilibili\.com|b23\.tv|acg\.tv|BV[0-9A-Za-z]{10})/i],
+  ['xiaohongshu', /(xiaohongshu\.com|xhslink\.(?:com|cn))/i],
+  ['tiktok', /(tiktok\.com|tiktokv\.com)/i],
+  ['douyin', /(douyin\.com|iesdouyin\.com)/i]
+];
+function detectPlatform(text){
+  const t = text || '';
+  for(const rule of PLATFORM_RULES){ if(rule[1].test(t)) return rule[0]; }
+  return '';
+}
+
+let platform = 'douyin';
+
+function setPlatform(name, opts){
+  const conf = PLATFORMS[name];
+  if(!conf || conf.disabled) return;
+  const changed = name !== platform;
+  platform = name;
+  opts = opts || {};
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    const key = tab.dataset.platform;
+    const isActive = key === name;
+    tab.classList.toggle('active', isActive);
+    tab.style.setProperty('--tab-color', PLATFORMS[key].color);
+  });
+
+  document.documentElement.style.setProperty('--brand', conf.color);
+  document.documentElement.style.setProperty('--brand-grad', conf.grad);
+  input.placeholder = conf.placeholder;
+  $('hint').textContent = conf.hint;
+  $('historyTitle').textContent = '最近解析（' + conf.name + '）';
+
+  // 手动切换平台时清空输入与结果，避免「拿抖音的结果配 B站 的链接」这类串台；
+  // 自动识别触发时不擦掉用户刚粘贴的内容。
+  if(changed && !opts.keepInput){
+    input.value = '';
+    result.style.display = 'none';
+    hideError();
+    current = null;
+    bili = null;
+    tt = null;
+  }
+  loadHistory();
+}
+
+/* ---------------- 通用工具 ---------------- */
+function showError(msg){
+  errorBox.textContent = msg;
+  errorBox.style.display = 'block';
+}
+function hideError(){ errorBox.style.display = 'none'; }
+
+function fmt(n){
+  if(!n) return '0';
+  if(n >= 100000000) return (n/100000000).toFixed(1).replace(/\.0$/,'') + '亿';
+  if(n >= 10000) return (n/10000).toFixed(1).replace(/\.0$/,'') + '万';
+  return String(n);
+}
+function fmtDuration(sec){
+  if(!sec) return '';
+  const h = Math.floor(sec/3600);
+  const m = Math.floor((sec%3600)/60);
+  const s = Math.round(sec%60);
+  const p = n => String(n).padStart(2,'0');
+  return h ? (h + ':' + p(m) + ':' + p(s)) : (m + ':' + p(s));
+}
+function fmtTime(ts){
+  if(!ts) return '';
+  const d = new Date(ts*1000);
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function fmtSize(bytes){
+  if(!bytes) return '';
+  if(bytes >= 1073741824) return (bytes/1073741824).toFixed(2) + 'GB';
+  if(bytes >= 1048576) return (bytes/1048576).toFixed(1) + 'MB';
+  return Math.max(1, Math.round(bytes/1024)) + 'KB';
+}
+/* 当前结果属于哪个平台 —— 下载与预览链接都把它带给服务端。
+
+   服务端**猜不出**平台，只能靠域名；而 TikTok 的视频有一大部分并不落在 tiktokcdn 上，
+   而是落在 Akamai（*.akamaized.net）—— 偏偏 B站 也在用 Akamai。光看域名会把这类
+   TikTok 直链当成 B站 的，于是「用 B站 的 Referer 去拉、还不挂代理」，
+   Akamai 边缘拿不到源站，回的就是 502（表现为「能解析、每条下载都 502」）。
+   解析那一刻就知道是哪个平台，这个事实必须一路带到取流那一层。 */
+let dlPlatform = '';
+function dl(url, name){
+  return API_BASE + '/api/download?url=' + encodeURIComponent(url) + '&name=' + encodeURIComponent(name)
+       + (dlPlatform ? '&platform=' + encodeURIComponent(dlPlatform) : '');
+}
+function proxy(url){
+  return API_BASE + '/api/proxy?url=' + encodeURIComponent(url)
+       + (dlPlatform ? '&platform=' + encodeURIComponent(dlPlatform) : '');
+}
+function padIdx(n){ return String(n).padStart(3,'0'); }
+
+/* 是否运行在安卓 WebView 容器里。
+   WebView 的 DownloadListener 与系统下载器只认 http(s) 直链 —— 它们既发不出
+   POST，也拿不到 blob: URL。 */
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+
+/* ---------------- 安卓：下载改由 App 自己完成 ----------------
+   原先安卓上走的是「点击链接 → WebView 的 DownloadListener → 系统 DownloadManager」。
+   这条链在安卓上有若干**静默**失败点（回调不一定触发；DownloadManager 跑在别的进程，
+   取不到 127.0.0.1 的明文 HTTP；失败不回到页面也不出通知），
+   表现就是用户看到的「点了下载没反应」，而且没有任何线索可查。
+
+   现在改成：安卓上把链接拦下来，改为请求本机服务端的 /api/save ——
+   由 App 进程自己取流、自己落盘到公共「下载」目录，并把进度回给这个面板。
+   好处不只是「能下了」：进度、失败原因、取消、完成位置全都看得见。 */
+
+/* 任务 id → 建任务时的请求体。仅用于「重试」——失败多是偶发（CDN 抖动），
+   重试比让用户回上一页重新点一次友好。 */
+const saveRequests = {};
+let saveTimer = null;
+let saveIdleTicks = 0;
+
+/* 把 href 归一化成服务端认识的相对路径：APK 里 API_BASE 为空，
+   但用编辑器预览时是绝对地址，两种都要认。 */
+function saveRelative(href){
+  if(href && API_BASE && href.indexOf(API_BASE) === 0) return href.slice(API_BASE.length);
+  return href || '';
+}
+
+/* 判据只有一条：本机 /api/ 下的链接 = 打算下载的东西。
+   刻意不维护「哪些 /api/ 端点会吐字节」的白名单 —— 那种清单一定会漏
+   （第一版就漏了 /api/bili/danmaku，用户点下载弹幕照样没反应），而且每加一个
+   端点都要回来改。唯一必须排除的是 /api/save 自己：否则会自我递归。 */
+function isSaveLink(href){
+  const path = saveRelative(href);
+  if(path.indexOf('/api/') !== 0) return false;
+  return path !== '/api/save' && path.indexOf('/api/save?') !== 0 && path.indexOf('/api/save/') !== 0;
+}
+
+/* 文件名从哪来：优先 <a download>（合流/打包都设了它），
+   其次链接自己的 name 参数（/api/download?url=..&name=xxx.mp4）。 */
+function saveNameFromLink(href, downloadAttr){
+  if(downloadAttr) return downloadAttr;
+  try{
+    const qs = saveRelative(href).split('?')[1] || '';
+    return new URLSearchParams(qs).get('name') || '';
+  }catch(e){ return ''; }
+}
+
+function ensureSavePanel(){
+  let el = document.getElementById('savePanel');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'savePanel';
+  el.style.cssText =
+    'position:fixed;left:10px;right:10px;bottom:10px;z-index:60;display:none;' +
+    'background:var(--card);border:1px solid var(--line);border-radius:var(--radius);' +
+    'box-shadow:var(--shadow);padding:12px 14px;font-size:13px;line-height:1.5;' +
+    'max-height:44vh;overflow:auto';
+  el.addEventListener('click', onSavePanelClick);
+  document.body.appendChild(el);
+  return el;
+}
+
+function onSavePanelClick(ev){
+  const node = ev.target;
+  if(!node || !node.getAttribute) return;
+  if(node.getAttribute('data-save-close')){
+    ev.preventDefault();
+    saveStopTimer();
+    saveHide();
+    return;
+  }
+  const cancelId = node.getAttribute('data-save-cancel');
+  if(cancelId){
+    ev.preventDefault();
+    fetch(API_BASE + '/api/save/cancel', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({id: cancelId})
+    }).catch(()=>{});
+    return;
+  }
+  const retryId = node.getAttribute('data-save-retry');
+  if(retryId){
+    ev.preventDefault();
+    const body = saveRequests[retryId];
+    if(body) androidSave(body);
+  }
+}
+
+function saveButton(attr, label){
+  return '<button ' + attr + ' style="border:1px solid var(--line);background:#fff;color:var(--text);' +
+    'border-radius:8px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer;margin-left:8px">' +
+    label + '</button>';
+}
+
+function saveRowHtml(t){
+  const out = [];
+  const percentText = t.percent >= 0 ? (t.percent + '%') : '';
+  out.push('<div style="display:flex;align-items:baseline;gap:8px">' +
+    '<div style="flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+      escapeHtml(t.name || '') + '</div>' +
+    '<div style="color:var(--text-2);font-size:12px;flex:none">' + percentText + '</div></div>');
+
+  const active = (t.state === 'running' || t.state === 'queued');
+  if(active){
+    // percent < 0 表示长度未知（分块流 / 边打包边给）：给一条虚化的条，
+    // 而不是编一个会倒退的百分比
+    const width = t.percent >= 0 ? Math.max(3, t.percent) : 30;
+    out.push('<div style="height:6px;background:#eef0f3;border-radius:999px;overflow:hidden;margin:6px 0 4px">' +
+      '<div style="height:100%;width:' + width + '%;background:var(--brand);' +
+      (t.percent >= 0 ? 'transition:width .3s' : 'opacity:.45') + '"></div></div>');
+  }
+
+  const bits = [];
+  let color = 'var(--text-2)';
+  if(t.state === 'running' || t.state === 'queued'){
+    bits.push(escapeHtml(t.detail || ''));
+    if(t.speed) bits.push(fmtSize(t.speed) + '/s');
+  }else if(t.state === 'done'){
+    bits.push('✓ 已保存到 ' + escapeHtml(t.location || ''));
+  }else if(t.state === 'error'){
+    color = '#b91c1c';
+    bits.push('✗ ' + escapeHtml(t.error || '下载失败'));
+  }else{
+    bits.push('已取消');
+  }
+  out.push('<div style="color:' + color + ';font-size:12px">' + bits.filter(Boolean).join(' · ') + '</div>');
+
+  if(t.warning){
+    out.push('<div style="color:#b45309;font-size:12px;margin-top:4px">⚠ ' + escapeHtml(t.warning) + '</div>');
+  }
+
+  const actions = [];
+  if(active) actions.push(saveButton('data-save-cancel="' + t.id + '"', '取消'));
+  if(t.state === 'error' && saveRequests[t.id]) actions.push(saveButton('data-save-retry="' + t.id + '"', '重试'));
+  if(actions.length) out.push('<div style="text-align:right;margin-top:4px">' + actions.join('') + '</div>');
+
+  return '<div>' + out.join('') + '</div>';
+}
+
+function saveRender(list){
+  const active = list.filter(t => t.state === 'queued' || t.state === 'running');
+  const finished = list.filter(t => !(t.state === 'queued' || t.state === 'running'));
+  const shown = active.concat(finished).slice(0, 4);
+
+  if(!shown.length){ saveHide(); return; }
+
+  const panel = ensureSavePanel();
+  panel.style.display = 'block';
+  const left = active.length + finished.length - shown.length;
+  const title = active.length
+    ? '下载中（' + active.length + ' 个任务）'
+    : '下载已完成';
+  panel.innerHTML =
+    '<div style="font-weight:700;margin-bottom:8px;display:flex;align-items:center">' +
+      '<span style="flex:1">' + title + '</span>' +
+      saveButton('data-save-close="1"', '收起') +
+    '</div>' +
+    shown.map(saveRowHtml).join('<div style="height:1px;background:var(--line);margin:9px 0"></div>') +
+    (left > 0 ? '<div style="color:var(--text-2);font-size:12px;margin-top:8px">另有 ' + left + ' 个，见系统「下载」目录</div>' : '');
+}
+
+function saveHide(){
+  const panel = document.getElementById('savePanel');
+  if(panel) panel.style.display = 'none';
+}
+
+async function saveRefresh(){
+  let list = [];
+  try{
+    const res = await fetch(API_BASE + '/api/save/list?limit=20');
+    const data = await res.json();
+    list = (data && data.tasks) || [];
+  }catch(e){
+    return;   // 本地服务的偶发抖动不算任务失败，等下一次轮询
+  }
+  saveRender(list);
+
+  const busy = list.some(t => t.state === 'queued' || t.state === 'running');
+  if(busy){
+    saveIdleTicks = 0;
+    return;
+  }
+  // 结束之后再留 15 秒，让用户看清「已保存到…」，然后自动收起
+  if(++saveIdleTicks >= 15){
+    saveStopTimer();
+    saveHide();
+  }
+}
+
+function saveStopTimer(){
+  if(saveTimer){ clearInterval(saveTimer); saveTimer = null; }
+}
+
+function saveWatch(){
+  if(saveTimer) return;
+  saveTimer = setInterval(saveRefresh, 1000);
+  saveRefresh();
+}
+
+/* 建下载任务。失败原因直接落到页面顶部的错误条上 —— 不再有「悄悄失败」。 */
+async function androidSave(body){
+  try{
+    const res = await fetch(API_BASE + '/api/save', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    let info = {};
+    try{ info = await res.json(); }catch(e){}
+    if(!res.ok) throw new Error(info.detail || info.error || ('HTTP ' + res.status));
+    if(info.id) saveRequests[info.id] = body;
+    saveIdleTicks = 0;
+    saveWatch();
+    return info;
+  }catch(err){
+    showError('加入下载失败：' + err.message);
+    return null;
+  }
+}
+
+async function androidSaveLink(href, downloadAttr){
+  return androidSave({
+    kind:'url',
+    source: saveRelative(href),
+    name: saveNameFromLink(href, downloadAttr)
+  });
+}
+
+if(IS_ANDROID){
+  /* 捕获阶段拦下所有本机下载链接。
+     用捕获 + 事件委托，是为了**一并接住程序化点击**（「逐张下载」「合流」
+     都是自己造一个 <a> 再 a.click()）—— 那些点击同样会冒泡到 document。 */
+  document.addEventListener('click', function(ev){
+    const node = ev.target;
+    const a = (node && node.closest) ? node.closest('a[href]') : null;
+    if(!a) return;
+    const raw = a.getAttribute('href') || '';
+    if(!isSaveLink(raw)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    androidSaveLink(raw, a.getAttribute('download') || '');
+  }, true);
+}
+
+
+/* 图集打包下载：整包为 ZIP，规避浏览器对多文件连续下载的拦截 */
+async function zipAll(d, btn, entries, label){
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '打包中…（'+label+'，请稍候）';
+  hideError();
+  try{
+    if(IS_ANDROID){
+      // 安卓：整包交给 App 内的下载器（服务端边抓边打，能报「已打包 12/30」）。
+      // 不再需要 prepare/get 两段式 —— 那是为了迁就「系统下载器只认直链」而设的，
+      // 现在下载在 App 进程里，直接 POST 条目列表更短、进度也更准。
+      const info = await androidSave({kind:'zip', items: entries, name: d.filename});
+      if(!info){ btn.textContent = old; return; }
+      btn.textContent = '已加入下载队列 ✓';
+      setTimeout(()=> btn.textContent = old, 2500);
+      return;
+    }
+    const res = await fetch(API_BASE + '/api/zip', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({items: entries, name: d.filename})
+    });
+    if(!res.ok){
+      let msg = 'HTTP ' + res.status;
+      try{ const j = await res.json(); msg = j.detail || j.error || msg; }catch(e){}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = d.filename + '_打包.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=> URL.revokeObjectURL(href), 60000);
+    btn.textContent = '已下载 ✓';
+    setTimeout(()=> btn.textContent = old, 2000);
+  }catch(err){
+    showError('打包下载失败：' + err.message + '（可改用「逐张下载」）');
+    btn.textContent = old;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+/* ---------------- 解析 ---------------- */
+let current = null;      // 抖音：当前作品数据
+let currentIdx = 0;      // 抖音：当前选中的清晰度索引
+let bili = null;         // B站：当前作品状态
+let tt = null;           // TikTok：当前作品状态
+
+async function doParse(){
+  const text = input.value.trim();
+  if(!text){ showError(PLATFORMS[platform].empty); return; }
+
+  // 粘贴后自动识别平台：命中则自动切到对应 tab（保留已输入内容）
+  const detected = detectPlatform(text);
+  if(detected && detected !== platform && !PLATFORMS[detected].disabled){
+    setPlatform(detected, {keepInput:true});
+  }
+  const target = detected || platform;
+
+  hideError();
+  result.style.display = 'none';
+  loading.style.display = 'block';
+  btnParse.disabled = true;
+  btnParse.textContent = '解析中…';
+
+  try{
+    const res = await fetch(API_BASE + '/api/parse', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text, platform: target})
+    });
+    const json = await res.json();
+    if(!json.success){
+      showError(json.error || '解析失败，请确认链接有效后重试');
+      return;
+    }
+    if(json.platform === 'bilibili'){ renderBilibili(json.data); }
+    else if(json.platform === 'tiktok'){ renderTiktok(json.data); }
+    else if(json.platform === 'xiaohongshu'){ renderXhs(json.data); }
+    else{ renderDouyin(json.data); }
+    saveHistory(json.platform || target, json.data, text);
+  }catch(e){
+    showError(
+      '无法连接本地解析服务（' + (API_BASE || location.origin) + '）。请确认服务窗口还开着，' +
+      '然后用浏览器打开 ' + (API_BASE || location.origin) + ' 使用。原始错误：' + e.message
+    );
+  }finally{
+    loading.style.display = 'none';
+    btnParse.disabled = false;
+    btnParse.textContent = '开始解析';
+  }
+}
+
+/* ---------------- 抖音渲染（原有逻辑） ---------------- */
+function currentUrl(){
+  if(!current || !current.qualities || !current.qualities.length) return '';
+  const q = current.qualities[currentIdx] || current.qualities[0];
+  return q.url;
+}
+
+/* ---------------- 图文/视频 通用渲染（抖音 / 小红书 共用） ---------------- */
+/* 默认值刻意与抖音原有输出完全一致，避免改动破坏既有行为 */
+const MEDIA_DEFAULTS = {
+  badgeHtml: '<span class="badge">无水印</span>',
+  liveLabel: '实况',
+  authorFallback: '抖音用户'
+};
+
+function renderMedia(d, opt){
+  opt = Object.assign({}, MEDIA_DEFAULTS, opt || {});
+  current = d;
+  bili = null;
+  tt = null;
+  currentIdx = 0;
+  const isVideo = d.type === 'video' && d.video_urls && d.video_urls.length;
+  const media = $('media');
+
+  if(isVideo){
+    const src = proxy(currentUrl());
+    media.innerHTML =
+      '<video id="player" src="'+src+'" controls playsinline preload="metadata" '+
+      'style="width:100%;border-radius:12px;background:#000" '+
+      (d.cover ? 'poster="'+proxy(d.cover)+'"' : '')+'></video>';
+  }else if(d.cover){
+    media.innerHTML = '<div class="cover-wrap"><img src="'+proxy(d.cover)+'" alt="封面"></div>';
+  }else{ media.innerHTML = ''; }
+
+  $('title').innerHTML = escapeHtml(d.title) + opt.badgeHtml;
+  $('title').title = d.title;
+
+  const av = d.author_avatar || '';
+  $('author').innerHTML =
+    (av ? '<img src="'+proxy(av)+'" alt="">' : '') +
+    '<span>@'+escapeHtml((d.author && d.author.nickname) || opt.authorFallback)+'</span>';
+
+  const meta = [];
+  if(d.duration) meta.push('时长 <b>'+fmtDuration(d.duration)+'</b>');
+  if(d.stats && d.stats.digg) meta.push('点赞 <b>'+fmt(d.stats.digg)+'</b>');
+  if(opt.showCollect && d.stats && d.stats.collect) meta.push('收藏 <b>'+fmt(d.stats.collect)+'</b>');
+  if(d.stats && d.stats.comment) meta.push('评论 <b>'+fmt(d.stats.comment)+'</b>');
+  if(d.stats && d.stats.share) meta.push('转发 <b>'+fmt(d.stats.share)+'</b>');
+  if(d.create_time) meta.push('发布于 <b>'+fmtTime(d.create_time)+'</b>');
+  $('meta').innerHTML = meta.join('　');
+
+  // 清晰度选择器
+  const qbox = $('qualityBox');
+  if(isVideo && d.qualities && d.qualities.length > 1){
+    qbox.innerHTML =
+      '<div class="quality">'+
+      '<label>清晰度</label>'+
+      '<select id="qsel">'+
+      d.qualities.map((q,i) =>
+        '<option value="'+i+'">'+escapeHtml(q.label)+'</option>').join('')+
+      '</select>'+
+      (d.hd ? '<span class="tag-hd">高清通道</span>'
+            : '<span class="tag-fallback">降级通道 · 仅默认档</span>')+
+      '</div>';
+    $('qsel').onchange = e => {
+      currentIdx = parseInt(e.target.value, 10) || 0;
+      const player = document.getElementById('player');
+      if(player){ player.src = proxy(currentUrl()); }
+      const a = document.getElementById('aVideo');
+      if(a){ a.href = dl(currentUrl(), current.filename + '.mp4'); }
+    };
+  }else if(isVideo){
+    qbox.innerHTML = '<div class="quality">'+
+      (d.hd ? '<span class="tag-hd">高清通道</span>'
+            : '<span class="tag-fallback">降级通道 · 仅默认档</span>')+'</div>';
+  }else{
+    qbox.innerHTML = '';
+  }
+
+  const acts = [];
+  if(isVideo){
+    acts.push('<a class="btn-dl" id="aVideo" href="'+dl(currentUrl(), d.filename+'.mp4')+'">⬇ 下载无水印视频</a>');
+  }
+  // 实况照片的动态部分（独立于静态图，需单独下载）
+  if(Array.isArray(d.live_videos) && d.live_videos.length){
+    acts.push('<button class="btn-dl sec" id="btnLive" style="border:none">▶ 下载'+opt.liveLabel+'动态视频（'+d.live_videos.length+'）</button>');
+  }
+  if(d.cover){
+    acts.push('<a class="btn-dl sec" href="'+dl(d.cover, d.filename+'_封面.jpg')+'">下载封面</a>');
+  }
+  if(d.music && d.music.url){
+    acts.push('<a class="btn-dl gray" href="'+dl(d.music.url, d.filename+'_原声.mp3')+'">下载原声</a>');
+  }
+  acts.push('<button class="btn-dl gray" id="btnCopy" style="border:none">复制直链</button>');
+  $('actions').innerHTML = acts.join('');
+
+  const liveBtn = $('btnLive');
+  if(liveBtn){
+    liveBtn.onclick = () => {
+      const lvs = d.live_videos;
+      lvs.forEach((lv,i) => {
+        setTimeout(() => {
+          const suffix = lvs.length > 1 ? '_'+padIdx(lv.index) : '';
+          const a = document.createElement('a');
+          a.href = dl(lv.url, d.filename + suffix + '_' + opt.liveLabel + '.mp4');
+          a.download = '';
+          document.body.appendChild(a); a.click(); a.remove();
+        }, i*350);
+      });
+    };
+  }
+
+  const copyBtn = $('btnCopy');
+  if(copyBtn){
+    copyBtn.onclick = () => {
+      const url = isVideo ? currentUrl() : ((d.images && d.images[0]) || d.cover);
+      copyText(url, copyBtn);
+    };
+  }
+
+  // 图集 / 实况照片
+  const box = $('imgsBox');
+  if(d.images && d.images.length){
+    const items = (Array.isArray(d.image_items) && d.image_items.length)
+      ? d.image_items
+      : d.images.map((u,i) => ({index:i+1, url:u}));
+    const liveCount = items.filter(it => it.live && it.live.url).length;
+
+    let figMeta = '共 ' + items.length + ' 张 · 无水印原图（最高清变体）';
+    if(liveCount) figMeta += ' · <span class="hi">含 ' + liveCount + ' 段' + opt.liveLabel + '动态视频</span>';
+    if(opt.liveMissingHint !== false && d.live_maybe_missing) figMeta += '（本次未能走高清通道，' + opt.liveLabel + '动态可能缺失，请稍后重试）';
+
+    // 打包条目：图片与实况动态视频混排，文件名在 ZIP 内用 ASCII 以免解压乱码
+    const zipEntries = [];
+    items.forEach(it => {
+      if(it.url) zipEntries.push({url: it.url, name: d.filename+'_'+padIdx(it.index)+'.jpg'});
+      if(it.live && it.live.url) zipEntries.push({url: it.live.url, name: d.filename+'_'+padIdx(it.index)+'_live.mp4'});
+    });
+    const zipLabel = items.length + ' 张' + (liveCount ? ' + ' + liveCount + ' 段' + opt.liveLabel : '');
+
+    box.innerHTML =
+      '<div class="fig-meta">' + figMeta + '</div>' +
+      '<div class="imgs">' + items.map(it => {
+        const live = (it.live && it.live.url) ? it.live : null;
+        const thumb = it.url || d.cover || '';
+        return '<figure><img src="'+proxy(thumb)+'" loading="lazy" alt="图'+it.index+'">'+
+          (it.url ? '<span class="tag-nw">无水印</span>' : '')+
+          (live ? '<span class="tag-live">▶ '+opt.liveLabel+'</span>' : '')+
+          '<div class="dls">'+
+            (it.url ? '<a href="'+dl(it.url, d.filename+'_'+padIdx(it.index)+'.jpg')+'">图</a>' : '')+
+            (live ? '<a class="live" href="'+dl(live.url, d.filename+'_'+padIdx(it.index)+'_'+opt.liveLabel+'.mp4')+'">动态</a>' : '')+
+          '</div></figure>';
+      }).join('') + '</div>' +
+      '<div class="row" style="margin-top:14px">'+
+        '<button class="btn-dl" id="btnZip" style="border:none">⬇ 打包下载全部（'+zipLabel+'）</button>'+
+        '<button class="btn-dl gray" id="btnAll" style="border:none">逐张下载</button>'+
+      '</div>';
+
+    $('btnZip').onclick = () => zipAll(d, $('btnZip'), zipEntries, zipLabel);
+    $('btnAll').onclick = () => {
+      let seq = 0;
+      items.forEach(it => {
+        if(it.url){
+          const u = it.url, n = d.filename+'_'+padIdx(it.index)+'.jpg';
+          setTimeout(() => {
+            const a = document.createElement('a');
+            a.href = dl(u, n); a.download = '';
+            document.body.appendChild(a); a.click(); a.remove();
+          }, (seq++)*350);
+        }
+        if(it.live && it.live.url){
+          const u = it.live.url, n = d.filename+'_'+padIdx(it.index)+'_'+opt.liveLabel+'.mp4';
+          setTimeout(() => {
+            const a = document.createElement('a');
+            a.href = dl(u, n); a.download = '';
+            document.body.appendChild(a); a.click(); a.remove();
+          }, (seq++)*350);
+        }
+      });
+    };
+  }else{
+    box.innerHTML = '';
+  }
+
+  result.style.display = 'block';
+}
+
+function renderDouyin(d){
+  dlPlatform = 'douyin';
+  return renderMedia(d, {});
+}
+
+/* 小红书：结构与抖音一致（images / image_items / qualities / live_videos），
+   差异只在文案口径 —— 平台徽标、作者兜底名、动图叫法（小红书叫「动图」）。 */
+function renderXhs(d){
+  dlPlatform = 'xiaohongshu';
+  return renderMedia(d, {
+    badgeHtml: '<span class="badge plat xhs">小红书 · 无水印</span>',
+    liveLabel: '动图',
+    authorFallback: '小红书用户',
+    showCollect: true,
+    liveMissingHint: false
+  });
+}
+
+/* ---------------- B站渲染 ---------------- */
+function biliVideoHref(){
+  if(!bili) return '';
+  const q = bili.qualities[bili.qnIdx] || bili.qualities[0];
+  return API_BASE + '/api/bili/download' +
+    '?bvid=' + encodeURIComponent(bili.bvid) +
+    '&cid=' + bili.cid +
+    '&qn=' + q.qn +
+    '&name=' + encodeURIComponent(bili.filename);
+}
+function biliAudioHref(){
+  if(!bili) return '';
+  return API_BASE + '/api/bili/audio?bvid=' + encodeURIComponent(bili.bvid) +
+    '&cid=' + bili.cid + '&name=' + encodeURIComponent(bili.filename);
+}
+function biliDanmakuHref(){
+  if(!bili) return '';
+  return API_BASE + '/api/bili/danmaku?bvid=' + encodeURIComponent(bili.bvid) +
+    '&cid=' + bili.cid + '&name=' + encodeURIComponent(bili.filename + '_P' + bili.page);
+}
+
+function biliQualityOption(q){
+  const bits = [escapeHtml(q.label)];
+  if(q.width && q.height) bits.push(q.width + 'x' + q.height);
+  if(q.size) bits.push('约' + fmtSize(q.size));
+  if(q.muxable === false) bits.push('手机端不支持合并');
+  return bits.join(' · ');
+}
+
+/* ---------------- B站 本机合流（安卓） ----------------
+   桌面版由服务端 ffmpeg 一步出片；APK 里没有 ffmpeg 命令行程序，改用系统自带的
+   MediaExtractor + MediaMuxer 在本机合流（不重编码，画质零损失）。
+   合流是异步任务：prepare 起任务 → 轮询 status 显示进度 → get 取成品。
+   最后一步必须是「点一个 http 直链」，因为 WebView 的下载回调只认直链。 */
+let muxToken = '';
+let muxTimer = null;
+let muxDowngradeNote = '';
+
+function muxRender(percent, detail){
+  const box = $('muxNote');
+  if(!box) return;
+  box.style.display = 'block';
+  box.className = 'mux-note' + (muxDowngradeNote ? ' warn' : '');
+  let html = '';
+  if(percent >= 0){
+    const pct = Math.max(0, Math.min(100, percent));
+    html += '<div class="mux-bar"><i style="width:' + pct + '%"></i></div>';
+  }
+  if(detail) html += '<div>' + escapeHtml(detail) + '</div>';
+  if(muxDowngradeNote) html += '<div style="margin-top:4px">⚠ ' + escapeHtml(muxDowngradeNote) + '</div>';
+  box.innerHTML = html;
+}
+
+function muxStopTimer(){
+  if(muxTimer){ clearInterval(muxTimer); muxTimer = null; }
+}
+
+async function biliMuxStart(btn){
+  muxStopTimer();
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '正在准备…';
+  muxDowngradeNote = '';
+  muxRender(0, '正在准备合流，请稍候…');
+  hideError();
+
+  try{
+    const q = bili.qualities[bili.qnIdx] || bili.qualities[0];
+    const res = await fetch(API_BASE + '/api/bili/mux/prepare', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        bvid: bili.bvid,
+        cid: bili.cid,
+        qn: (q && q.qn) || 0,
+        name: bili.filename,
+        duration: bili.duration || 0
+      })
+    });
+    let info = {};
+    try{ info = await res.json(); }catch(e){}
+    if(!res.ok) throw new Error(info.detail || info.error || ('HTTP ' + res.status));
+
+    muxToken = info.token;
+    muxDowngradeNote = info.note || '';
+    muxRender(0, '合流任务已建立，正在拉取流…');
+    btn.textContent = '合流中… 0%';
+
+    const st = await new Promise((resolve, reject) => {
+      let misses = 0;
+      muxTimer = setInterval(async () => {
+        try{
+          const sres = await fetch(API_BASE + '/api/bili/mux/status?token=' +
+            encodeURIComponent(muxToken));
+          const state = await sres.json();
+          misses = 0;
+          if(state.state === 'running'){
+            btn.textContent = (state.phase === 'download' ? '下载中… ' : '合流中… ') +
+              (state.percent || 0) + '%';
+            muxRender(state.percent || 0, state.detail || '');
+            return;
+          }
+          muxStopTimer();
+          if(state.state === 'ready'){ resolve(state); }
+          else { reject(new Error(state.error || '合流失败')); }
+        }catch(e){
+          // 本地服务的偶发抖动不算任务失败，连续多次拿不到状态才放弃
+          if(++misses >= 5){ muxStopTimer(); reject(e); }
+        }
+      }, 1200);
+    });
+
+    // 交给下载器。安卓上这个 <a> 会被上面的捕获监听拦下，改走 /api/save；
+    // 桌面浏览器则照常走浏览器自身的下载。
+    const a = document.createElement('a');
+    a.href = API_BASE + '/api/bili/mux/get?token=' + encodeURIComponent(muxToken);
+    a.download = info.filename || (bili.filename + '.mp4');
+    document.body.appendChild(a); a.click(); a.remove();
+
+    muxRender(100, '合流完成（' + fmtSize(st.size || 0) + '），' +
+      (IS_ANDROID ? '正在保存到手机…' : '正在保存到系统「下载」目录'));
+    btn.textContent = IS_ANDROID ? '保存中，见下方进度' : '已交给系统下载 ✓';
+    setTimeout(()=>{ btn.textContent = old; btn.disabled = false; }, 3000);
+  }catch(err){
+    muxStopTimer();
+    showError('本机合流失败：' + err.message);
+    muxRender(-1, '');
+    const box = $('muxNote');
+    if(box){ box.style.display = 'none'; box.innerHTML = ''; }
+    btn.textContent = old;
+    btn.disabled = false;
+  }
+}
+
+/* 根据「服务端 ffmpeg / 手机本机合流 / 都没有」三态，重建 B站 的操作按钮区 */
+function renderBiliActions(d){
+  const acts = [];
+  const ffOk = !!(d.ffmpeg && d.ffmpeg.available);
+  const muxOk = !!(d.muxer && d.muxer.available);
+
+  if(ffOk){
+    acts.push('<a class="btn-dl" id="aVideo" href="'+biliVideoHref()+'">⬇ 下载无水印视频（合流 mp4）</a>');
+  }else if(muxOk){
+    acts.push('<button class="btn-dl" id="btnMux" style="border:none">⬇ 下载无水印视频（本机合流 mp4）</button>');
+  }else{
+    const q = bili.qualities[bili.qnIdx] || bili.qualities[0];
+    if(q && q.url){
+      acts.push('<a class="btn-dl" href="'+dl(q.url, bili.filename+'_视频轨.mp4')+'">⬇ 视频轨（无声音）</a>');
+    }
+    if(d.audio && d.audio.url){
+      acts.push('<a class="btn-dl sec" href="'+dl(d.audio.url, bili.filename+'_音频轨.m4a')+'">⬇ 音频轨</a>');
+    }
+  }
+  if(d.cover){
+    acts.push('<a class="btn-dl sec" href="'+dl(d.cover, bili.filename+'_封面.jpg')+'">下载封面</a>');
+  }
+  if(ffOk){
+    acts.push('<a class="btn-dl gray" href="'+biliAudioHref()+'">下载音频 MP3</a>');
+  }
+  acts.push('<a class="btn-dl gray" href="'+biliDanmakuHref()+'">下载弹幕 XML</a>');
+  acts.push('<button class="btn-dl gray" id="btnCopy" style="border:none">复制直链</button>');
+  acts.push('<div class="mux-note" id="muxNote" style="display:none"></div>');
+
+  $('actions').innerHTML = acts.join('');
+
+  const copyBtn = $('btnCopy');
+  if(copyBtn){
+    copyBtn.onclick = () => {
+      const q = bili.qualities[bili.qnIdx] || bili.qualities[0];
+      copyText((q && q.url) || '', copyBtn);
+    };
+  }
+
+  const muxBtn = $('btnMux');
+  if(muxBtn){
+    muxBtn.onclick = () => biliMuxStart(muxBtn);
+  }
+}
+
+/* 切换分P后重新拉取该 P 的真实档位（B站 每个 cid 的档位可能不同） */
+async function biliLoadTracks(cid, duration){
+  try{
+    const res = await fetch(API_BASE + '/api/bili/tracks?bvid=' + encodeURIComponent(bili.bvid) +
+      '&cid=' + cid + '&duration=' + (duration || 0));
+    const json = await res.json();
+    if(!json.success){ showError(json.error || '该分P的清晰度获取失败'); return false; }
+    bili.qualities = json.qualities || [];
+    bili.qnIdx = 0;
+    bili.audio = json.audio || null;
+    bili.cid = cid;
+    renderBiliQuality(bili.lastData);
+    return true;
+  }catch(e){
+    showError('切换分P失败：' + e.message);
+    return false;
+  }
+}
+
+function renderBiliQuality(d){
+  const qbox = $('qualityBox');
+  let html = '';
+
+  // 分P选择（单P视频不显示）
+  if(d.pages && d.pages.length > 1){
+    html += '<div class="quality"><label>分P</label><select id="psel">' +
+      d.pages.map(p => '<option value="'+p.page+'" data-cid="'+p.cid+'" data-duration="'+(p.duration||0)+'"' +
+        (p.page === bili.page ? ' selected' : '')+'>' +
+        'P'+p.page+' · '+escapeHtml(p.part || '') + '</option>').join('') +
+      '</select><span class="tag-fallback">共'+d.pages.length+'P</span></div>';
+  }
+
+  // 清晰度选择：只列服务端真实拿到轨道的档位，杜绝「选了 4K 实际给 480P」的假选项
+  if(bili.qualities.length > 1){
+    html += '<div class="quality"><label>清晰度</label><select id="qsel">' +
+      bili.qualities.map((q,i) => '<option value="'+i+'"'+(i===bili.qnIdx?' selected':'')+'>' +
+        biliQualityOption(q) + '</option>').join('') +
+      '</select><span class="tag-hd">共'+bili.qualities.length+'档可用</span></div>';
+  }else if(bili.qualities.length === 1){
+    html += '<div class="quality"><span class="tag-fallback">仅 1 档可用：' +
+      escapeHtml(bili.qualities[0].label) + '</span></div>';
+  }
+
+  // 账号状态：一眼看出 SESSDATA 到底生效没有（这是「填了 Cookie 还是 480P」的第一排查点）
+  // 文案以「实际能下到的最高档」为准，而不是 nav 的 vipStatus ——
+  // 实测存在 vipStatus=0（会员已过期）却仍能取到 qn=120 4K 的账号，用 vipStatus 预测会误报。
+  if(d.account){
+    const a = d.account;
+    const top = bili.qualities[0];
+    let txt, cls;
+    if(a.logged_in){
+      txt = '已登录' + (a.vip ? ' · 大会员' : '') + (top ? ' · 最高 ' + top.label : '');
+      cls = 'tag-hd';
+    }else if(a.configured){
+      txt = 'SESSDATA 无效或已过期';
+      cls = 'tag-warn';
+    }else{
+      txt = '未登录 · 最高 480P';
+      cls = 'tag-fallback';
+    }
+    html += '<div class="quality"><label>账号</label><span class="'+cls+'">'+escapeHtml(txt)+'</span>' +
+      '<button class="btn-mini" id="btnAccountCfg" style="border:none">' +
+      (a.logged_in ? '更换账号' : '配置账号 →') + '</button></div>';
+  }
+
+  // 提示条：账号状态 / 合流能力
+  if(d.hint){
+    html += '<div class="notice">' + escapeHtml(d.hint) + '</div>';
+  }
+  if(!(d.ffmpeg && d.ffmpeg.available)){
+    if(d.muxer && d.muxer.available){
+      // 安卓端：没有 ffmpeg 命令行程序，但系统自带 MediaExtractor + MediaMuxer，
+      // 合流一样是无损的（-c copy 等价），所以这里不该吓唬用户
+      html += '<div class="notice">本机没有 ffmpeg，但自带系统级封装器：' +
+        '点下面的下载按钮会用 <b>MediaExtractor + MediaMuxer</b> 在本机无损合流，' +
+        '不重新编码、画质无损失，也无需安装任何东西。</div>';
+    }else{
+      html += '<div class="notice warn">未找到 ffmpeg，无法把音视频轨合流成可直接播放的 mp4。' +
+        '可先分别下载下面两条轨自行合并，或安装 ffmpeg 后重启服务。合流命令：' +
+        '<br><code>ffmpeg -i 视频轨.m4s -i 音频轨.m4s -c copy 输出.mp4</code></div>';
+    }
+  }
+
+  qbox.innerHTML = html;
+
+  const qsel = $('qsel');
+  if(qsel){
+    qsel.onchange = e => {
+      bili.qnIdx = parseInt(e.target.value, 10) || 0;
+      renderBiliActions(bili.lastData);
+    };
+  }
+  const psel = $('psel');
+  if(psel){
+    psel.onchange = async e => {
+      const opt = e.target.selectedOptions[0];
+      const cid = parseInt(opt.dataset.cid, 10);
+      const dur = parseInt(opt.dataset.duration, 10) || 0;
+      bili.page = parseInt(opt.value, 10);
+      const ok = await biliLoadTracks(cid, dur);
+      if(ok){ loadHistory(); }
+    };
+  }
+  // 「账号」一行的小按钮：直接从结果区进设置，不必回到顶部找入口
+  const cfgBtn = $('btnAccountCfg');
+  if(cfgBtn){ cfgBtn.onclick = openSettings; }
+}
+
+function renderBilibili(d){
+  dlPlatform = 'bilibili';
+  bili = {
+    bvid: d.bvid,
+    cid: d.cid,
+    page: d.current_page,
+    qualities: d.qualities || [],
+    qnIdx: 0,
+    filename: d.filename,
+    audio: d.audio,
+    // 本机合流靠它把「已处理到第几秒」换算成百分比
+    duration: d.duration || 0,
+    lastData: d
+  };
+  current = null;
+
+  const media = $('media');
+  media.innerHTML = d.cover
+    ? '<div class="cover-wrap"><img src="'+proxy(d.cover)+'" alt="封面">' +
+      '<span class="badge-live">B站 · 无水印</span></div>'
+    : '';
+
+  $('title').innerHTML = escapeHtml(d.title) + '<span class="badge plat">B站</span>';
+  $('title').title = d.title;
+
+  $('author').innerHTML =
+    (d.author_avatar ? '<img src="'+proxy(d.author_avatar)+'" alt="">' : '') +
+    '<span>@' + escapeHtml(d.author || 'UP主') + '</span>';
+
+  const meta = [];
+  if(d.duration) meta.push('时长 <b>'+fmtDuration(d.duration)+'</b>');
+  if(d.stats && d.stats.view) meta.push('播放 <b>'+fmt(d.stats.view)+'</b>');
+  if(d.stats && d.stats.danmaku) meta.push('弹幕 <b>'+fmt(d.stats.danmaku)+'</b>');
+  if(d.stats && d.stats.like) meta.push('点赞 <b>'+fmt(d.stats.like)+'</b>');
+  if(d.pubdate) meta.push('发布于 <b>'+fmtTime(d.pubdate)+'</b>');
+  $('meta').innerHTML = meta.join('　');
+
+  renderBiliQuality(d);
+  renderBiliActions(d);
+  $('imgsBox').innerHTML = '';
+  result.style.display = 'block';
+}
+
+/* ---------------- TikTok 渲染 ----------------
+   TikTok 与 B站 的关键差别：它的播放源是「音视频合一的渐进式 mp4」，
+   单条直链即可播放与下载，不需要 ffmpeg 合流，所以没有 ffmpeg 相关的分支。
+   实测该接口给出 fps 字段，而 yt-dlp 给不出 —— 排序口径按「分辨率 → 帧率 → 码率」。 */
+
+function ttCurrent(){
+  if(!tt || !tt.qualities || !tt.qualities.length) return null;
+  return tt.qualities[tt.qnIdx] || tt.qualities[0];
+}
+function ttHref(){
+  const q = ttCurrent();
+  return q ? dl(q.url, tt.filename + '.mp4') : '#';
+}
+
+function renderTtActions(d){
+  const q = ttCurrent();
+  const acts = [];
+
+  if(q && q.url){
+    acts.push('<a class="btn-dl" id="aTtDl" href="'+ttHref()+'">⬇ 下载无水印视频' +
+      '（'+escapeHtml(q.label)+'）</a>');
+  }else{
+    acts.push('<span class="notice warn">没有可下载的直链</span>');
+  }
+  if(d.cover){
+    acts.push('<a class="btn-dl sec" href="'+dl(d.cover, tt.filename+'_封面.jpg')+'">下载封面</a>');
+  }
+  acts.push('<button class="btn-dl gray" id="btnTtCopy" style="border:none">复制直链</button>');
+
+  $('actions').innerHTML = acts.join('');
+
+  const copyBtn = $('btnTtCopy');
+  if(copyBtn){
+    copyBtn.onclick = () => { const c = ttCurrent(); copyText((c && c.url) || '', copyBtn); };
+  }
+}
+
+function renderTtQuality(d){
+  const qbox = $('qualityBox');
+  let html = '';
+
+  // 档位下拉。实测 TikTok 网页端经常只给 1 个档位（如仅 original_2160_0），
+  // 所以「只有一档」是常态而非异常，文案要写成结论而不是缺陷。
+  if(tt.qualities.length > 1){
+    html += '<div class="quality"><label>画质</label><select id="tqsel">' +
+      tt.qualities.map((q,i) => '<option value="'+i+'"'+(i===tt.qnIdx?' selected':'')+'>' +
+        escapeHtml(q.label) + (q.size ? ' · ' + fmtSize(q.size) : '') + '</option>').join('') +
+      '</select><span class="tag-hd">共'+tt.qualities.length+'档可用</span></div>';
+  }else if(tt.qualities.length === 1){
+    const only = tt.qualities[0];
+    html += '<div class="quality"><label>画质</label>' +
+      '<span class="tag-hd">'+escapeHtml(only.label)+'</span>' +
+      '<span class="tag-fallback">全站最高，无更低档</span></div>';
+  }
+
+  const q = ttCurrent();
+  if(q){
+    const bits = [];
+    if(q.size) bits.push(fmtSize(q.size));
+    if(q.bitrate) bits.push((q.bitrate/1000000).toFixed(1)+' Mbps');
+    if(q.gear) bits.push(q.gear);
+    if(bits.length){
+      html += '<div class="quality"><label>参数</label>' +
+        '<span class="tag-fallback">'+escapeHtml(bits.join(' · '))+'</span></div>';
+    }
+  }
+
+  // 代理状态：把「当前用哪个代理」明示出来，排查时能省一步。
+  // 注意「未配置代理」既可能是大陆环境下的配置缺失，也可能是境外部署的正常直连状态 ——
+  // 具体是哪种看后端返回的 outlet / reachable，别在前端下结论。
+  if(d.proxy){
+    const auto = String(d.proxy.source || '').startsWith('auto');
+    const txt = d.proxy.configured
+      ? '代理 ' + d.proxy.value + (auto ? '（自动探测）' : '')
+      : '未配置代理';
+    html += '<div class="quality"><label>代理</label>' +
+      '<span class="'+(d.proxy.configured ? 'tag-hd' : 'tag-warn')+'">'+escapeHtml(txt)+'</span>' +
+      '<button class="btn-mini" id="btnTtProxyCfg" style="border:none">设置代理 →</button></div>';
+  }
+
+  if(d.hint){
+    html += '<div class="notice">' + escapeHtml(d.hint) + '</div>';
+  }
+
+  qbox.innerHTML = html;
+
+  const sel = $('tqsel');
+  if(sel){
+    sel.onchange = e => {
+      tt.qnIdx = parseInt(e.target.value, 10) || 0;
+      renderTtQuality(d);
+      renderTtActions(d);
+    };
+  }
+  const cfgBtn = $('btnTtProxyCfg');
+  if(cfgBtn){ cfgBtn.onclick = () => openSettings('tiktok'); }
+}
+
+function renderTiktok(d){
+  dlPlatform = 'tiktok';
+  tt = {
+    qualities: d.qualities || [],
+    qnIdx: d.best_index || 0,
+    filename: d.filename || ('tiktok_' + (d.id || '')),
+    lastData: d
+  };
+  current = null;
+  bili = null;
+
+  // 与抖音一致给一个可播放的预览（走服务端代理，带 TikTok 自家 Referer）
+  const q = ttCurrent();
+  const media = $('media');
+  if(q && q.url){
+    media.innerHTML =
+      '<video id="player" src="'+proxy(q.url)+'" controls playsinline preload="metadata" '+
+      'style="width:100%;border-radius:12px;background:#000" '+
+      (d.cover ? 'poster="'+proxy(d.cover)+'"' : '')+'></video>';
+  }else{
+    media.innerHTML = d.cover
+      ? '<div class="cover-wrap"><img src="'+proxy(d.cover)+'" alt="封面"></div>' : '';
+  }
+
+  $('title').innerHTML = escapeHtml(d.title || ('TikTok ' + (d.id || ''))) +
+    '<span class="badge plat tt">TikTok</span>';
+  $('title').title = d.title || '';
+
+  const handle = (d.author && (d.author.unique_id || d.author.name)) || 'TikTok';
+  const nick = (d.author && d.author.name) || '';
+  $('author').innerHTML = '<span>@'+escapeHtml(handle)+'</span>' +
+    (nick && nick !== handle ? '<span class="sub-author">'+escapeHtml(nick)+'</span>' : '');
+
+  const meta = [];
+  if(d.duration) meta.push('时长 <b>'+fmtDuration(d.duration)+'</b>');
+  if(d.stats && d.stats.play) meta.push('播放 <b>'+fmt(d.stats.play)+'</b>');
+  if(d.stats && d.stats.digg) meta.push('点赞 <b>'+fmt(d.stats.digg)+'</b>');
+  if(d.stats && d.stats.comment) meta.push('评论 <b>'+fmt(d.stats.comment)+'</b>');
+  if(d.region) meta.push('区域 <b>'+escapeHtml(d.region)+'</b>');
+  $('meta').innerHTML = meta.join('　');
+
+  renderTtQuality(d);
+  renderTtActions(d);
+  $('imgsBox').innerHTML = '';
+  result.style.display = 'block';
+}
+
+function copyText(text, btn){
+  if(!text){ return; }
+  const done = () => {
+    const old = btn.textContent;
+    btn.textContent = '已复制 ✓';
+    setTimeout(()=> btn.textContent = old, 1600);
+  };
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallback());
+  }else{ fallback(); }
+  function fallback(){
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){}
+    ta.remove();
+  }
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---------------- 历史记录（按平台分开存，支持单条删除与清空全部） ---------------- */
+const HISTORY_LIMIT = 8;
+function historyKey(p){ return 'dl_history_' + p; }
+function historyId(d){ return d.bvid || d.aweme_id || d.note_id || d.id || d.title || ''; }
+
+function saveHistory(platformName, d, text){
+  try{
+    const key = historyKey(platformName);
+    let list = JSON.parse(localStorage.getItem(key) || '[]');
+    const id = historyId(d);
+    list = list.filter(x => x.id !== id);
+    list.unshift({id, title: d.title || '', text, ts: Date.now()});
+    list = list.slice(0, HISTORY_LIMIT);
+    localStorage.setItem(key, JSON.stringify(list));
+    loadHistory();
+  }catch(e){}
+}
+
+function loadHistory(){
+  const key = historyKey(platform);
+  let list = [];
+  try{ list = JSON.parse(localStorage.getItem(key) || '[]'); }catch(e){ list = []; }
+
+  const card = $('historyCard');
+  if(!list.length){ card.style.display = 'none'; $('history').innerHTML = ''; return; }
+
+  card.style.display = 'block';
+  $('btnClearHistory').textContent = '清空全部';
+  $('btnClearHistory').classList.remove('danger');
+
+  $('history').innerHTML = list.map((x, i) =>
+    '<div class="history-item" data-index="'+i+'">' +
+      '<span title="'+escapeHtml(x.title)+'">' + escapeHtml(x.title || '(无标题)') + '</span>' +
+      '<div class="hi-right"><small>重新解析 ›</small>' +
+      '<button class="del" data-del="'+i+'" title="删除这条记录">×</button></div>' +
+    '</div>'
+  ).join('');
+
+  document.querySelectorAll('.history-item').forEach(el => {
+    el.onclick = () => {
+      const item = list[parseInt(el.dataset.index, 10)];
+      if(!item) return;
+      input.value = item.text;
+      doParse();
+    };
+  });
+  document.querySelectorAll('[data-del]').forEach(btn => {
+    btn.onclick = ev => {
+      ev.stopPropagation();
+      const idx = parseInt(btn.dataset.del, 10);
+      list.splice(idx, 1);
+      try{ localStorage.setItem(key, JSON.stringify(list)); }catch(e){}
+      loadHistory();
+    };
+  });
+}
+
+function clearAllHistory(btn){
+  if(btn.dataset.armed !== '1'){
+    btn.dataset.armed = '1';
+    btn.textContent = '确认清空？';
+    btn.classList.add('danger');
+    setTimeout(() => {
+      if(btn.dataset.armed === '1'){
+        btn.dataset.armed = '0';
+        btn.textContent = '清空全部';
+        btn.classList.remove('danger');
+      }
+    }, 4000);
+    return;
+  }
+  try{ localStorage.removeItem(historyKey(platform)); }catch(e){}
+  btn.dataset.armed = '0';
+  loadHistory();
+}
+
+/* ---------------- B站 账号设置（SESSDATA / cookies） ---------------- */
+
+/* 面板内的提示统一走这个容器，不用 alert —— 弹窗会打断「粘贴→保存→重解析」的操作流，
+   而且 alert 在浏览器预览面板里还可能被拦截。 */
+function cfgMsg(kind, html){
+  const box = $('cfgMsg');
+  box.className = 'cfg-msg show ' + kind;
+  box.innerHTML = html;
+}
+function cfgMsgHide(){ $('cfgMsg').className = 'cfg-msg'; }
+
+/* 头部按钮：绿点 = B站 登录态已生效，灰点 = 未配置或无效 */
+function settingsBadge(account){
+  const btn = $('btnSettings');
+  const ok = !!(account && account.logged_in);
+  btn.classList.toggle('on', ok);
+  const dot = $('segDotBili');
+  if(dot) dot.classList.toggle('on', ok);
+  btn.title = (ok
+    ? 'B站 已登录' + (account.vip ? '（大会员）' : '') + (account.uname ? '：' + account.uname : '')
+    : 'B站 未配置 Cookie（最高 480P）')
+    + ' · 这里也能配置 TikTok 代理 · 点击打开设置';
+}
+
+function cfgSourceText(st){
+  if(st.env_override) return '环境变量 BILI_SESSDATA（优先级最高，改网页不生效）';
+  if(st.source === 'file') return '本机 bili_config.json';
+  return '未配置';
+}
+
+function renderCfgStatus(payload){
+  const st = payload.status || {}, ac = payload.account || {};
+  const lines = ['配置来源：<b>' + escapeHtml(cfgSourceText(st)) + '</b>'];
+
+  if(st.configured){
+    lines.push('SESSDATA：<code>' + escapeHtml(st.masked || '') + '</code> 共 <b>' + (st.length || 0) + '</b> 字符');
+    if(st.cookie_names && st.cookie_names.length > 1){
+      lines.push('同时生效：<code>' + escapeHtml(st.cookie_names.join(', ')) + '</code>');
+    }
+  }
+
+  if(!st.configured){
+    lines.push('登录状态：<b>未登录</b>，B站 只给到 480P');
+  }else if(ac.logged_in){
+    lines.push('登录状态：<b>已登录' + (ac.vip ? ' · 大会员' : '') + '</b>' +
+      (ac.uname ? '（' + escapeHtml(ac.uname) + '）' : ''));
+  }else if(ac.error){
+    lines.push('登录状态：<b>未能校验</b> —— ' + escapeHtml(ac.error));
+  }else{
+    lines.push('登录状态：<b>Cookie 无效或已过期</b>，解析时仍按未登录给到 480P');
+  }
+
+  if(!payload.ffmpeg_available){
+    lines.push('⚠ 未检测到 ffmpeg，B站 的高清档无法合流成可直接播放的 mp4');
+  }
+
+  $('cfgStatus').innerHTML = lines.join('<br>');
+  settingsBadge(ac);
+}
+
+async function loadCfgStatus(){
+  $('cfgStatus').innerHTML = '正在读取当前配置…';
+  try{
+    const res = await fetch(API_BASE + '/api/bili/config');
+    renderCfgStatus(await res.json());
+  }catch(e){
+    $('cfgStatus').innerHTML = '读取配置失败：' + escapeHtml(e.message || String(e)) +
+      '<br>请确认后端服务已启动（端口 ' + SERVICE_PORT + '）。';
+  }
+}
+
+/* ---------------- TikTok 代理面板 ---------------- */
+
+function ttMsg(kind, html){
+  const box = $('ttMsg');
+  box.className = 'cfg-msg show ' + kind;
+  box.innerHTML = html;
+}
+function ttMsgHide(){ $('ttMsg').className = 'cfg-msg'; }
+
+function ttSourceText(p){
+  if(!p.configured) return '未配置（也没探测到可用代理）';
+  if(p.from_config) return '本机 tiktok_config.json';
+  const src = String(p.source || '');
+  if(src.startsWith('auto:')) return '自动探测（端口 ' + src.split(':')[1] + '）';
+  if(src.startsWith('env:')) return '环境变量 ' + src.slice(4);
+  return src || '未知来源';
+}
+
+function renderTtStatus(payload){
+  const p = payload.proxy || {};
+  const lines = ['配置来源：<b>' + escapeHtml(ttSourceText(p)) + '</b>'];
+  if(p.configured) lines.push('代理地址：<code>' + escapeHtml(p.value || '') + '</code>');
+  if(p.reachable === true){
+    lines.push('连通性：<b>可用</b> —— 已实测能连上 TikTok');
+  }else if(p.reachable === false){
+    lines.push('连通性：<b>不可用</b>' + (p.detail ? '（' + escapeHtml(p.detail) + '）' : '') +
+      ' —— 请确认代理客户端已开启、且已连上节点');
+  }
+  if(p.candidates && p.candidates.length){
+    lines.push('探测到的本地代理端口：<code>' + p.candidates.join(', ') + '</code>');
+  }
+  if(!p.socks_supported){
+    lines.push('提示：当前环境未装 PySocks，<b>只能用 HTTP 代理</b>，填 socks5:// 会直接报错。');
+  }
+  $('ttStatus').innerHTML = lines.join('<br>');
+
+  const dot = $('segDotTt');
+  if(dot) dot.classList.toggle('on', !!(p.configured && p.reachable !== false));
+
+  // 只回填「用户自己写进配置文件」的值，自动探测出来的不填 —— 避免把探测结果
+  // 固化成一个用户并没主动选择的配置。正在输入时不打断。
+  const inp = $('ttProxy');
+  if(inp && document.activeElement !== inp) inp.value = p.from_config ? (p.value || '') : '';
+}
+
+async function loadTtStatus(){
+  $('ttStatus').innerHTML = '正在读取代理状态并实测连通性…';
+  try{
+    const res = await fetch(API_BASE + '/api/tiktok/config');
+    renderTtStatus(await res.json());
+  }catch(e){
+    $('ttStatus').innerHTML = '读取代理状态失败：' + escapeHtml(e.message || String(e)) +
+      '<br>请确认后端服务已启动（端口 ' + SERVICE_PORT + '）。';
+  }
+}
+
+async function saveTtCfg(){
+  const value = $('ttProxy').value.trim();
+  const saveBtn = $('btnTtSave');
+  saveBtn.disabled = true;
+  ttMsg('warn', value ? '正在保存并实测连通性…' : '正在清除代理配置，回到自动探测…');
+  try{
+    const res = await fetch(API_BASE + '/api/tiktok/config', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({proxy: value})
+    });
+    const d = await res.json();
+    renderTtStatus(d);
+    if(d.success){
+      ttMsg(d.verified === 'ok' || !value ? 'ok' : 'warn', escapeHtml(d.warning || '已保存'));
+      // 代理刚生效时，若正停在一条 TikTok 结果上，立刻重解析刷新
+      if(d.verified === 'ok' && platform === 'tiktok' && input.value.trim()){
+        closeSettings(); doParse();
+      }
+    }else{
+      ttMsg('err', escapeHtml(d.error || '保存失败'));
+    }
+  }catch(e){
+    ttMsg('err', '请求失败：' + escapeHtml(e.message || String(e)));
+  }finally{
+    saveBtn.disabled = false;
+  }
+}
+
+async function clearTtCfg(){
+  const btn = $('btnTtClear');
+  btn.disabled = true;
+  ttMsg('warn', '正在清除代理配置…');
+  try{
+    const d = await (await fetch(API_BASE + '/api/tiktok/config', {method:'DELETE'})).json();
+    renderTtStatus(d);
+    ttMsg('ok', escapeHtml(d.warning || '已清除'));
+    $('ttProxy').value = '';
+  }catch(e){
+    ttMsg('err', '请求失败：' + escapeHtml(e.message || String(e)));
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+/* ---------------- 设置弹窗：两个面板切换 ---------------- */
+let cfgSeg = 'bili';
+function setCfgSeg(name){
+  cfgSeg = (name === 'tiktok') ? 'tiktok' : 'bili';
+  document.querySelectorAll('#cfgSeg .seg').forEach(el => {
+    el.classList.toggle('active', el.dataset.seg === cfgSeg);
+  });
+  $('paneBili').style.display = cfgSeg === 'bili' ? '' : 'none';
+  $('paneTiktok').style.display = cfgSeg === 'tiktok' ? '' : 'none';
+  $('footBili').style.display = cfgSeg === 'bili' ? '' : 'none';
+  $('footTt').style.display = cfgSeg === 'tiktok' ? '' : 'none';
+}
+
+function openSettings(seg){
+  $('settingsModal').classList.add('show');
+  setCfgSeg(seg || cfgSeg);
+  cfgMsgHide();
+  ttMsgHide();
+  $('btnCfgForce').style.display = 'none';
+  loadCfgStatus();
+  loadTtStatus();
+}
+
+function closeSettings(){ $('settingsModal').classList.remove('show'); }
+
+async function saveCfg(force){
+  const text = $('cfgText').value.trim();
+  if(!text){ cfgMsg('err', '请先粘贴 Cookie 内容'); return; }
+
+  const saveBtn = $('btnCfgSave'), forceBtn = $('btnCfgForce');
+  saveBtn.disabled = forceBtn.disabled = true;
+  cfgMsg('warn', force ? '正在强制保存…' : '正在保存并向 B站 验证登录态（约 2~3 秒）…');
+
+  try{
+    const res = await fetch(API_BASE + '/api/bili/config', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text, force: !!force})
+    });
+    const d = await res.json();
+    renderCfgStatus(d);
+
+    if(d.success){
+      cfgMsg(d.verified === 'ok' ? 'ok' : 'warn', escapeHtml(d.warning || '已保存'));
+      forceBtn.style.display = 'none';
+      // 明文不回填到页面，减少被截图/录屏带走的概率
+      $('cfgText').value = '';
+      // 当前若正停在一个 B站 结果上，立刻重解析一次刷新可用档位
+      if(platform === 'bilibili' && input.value.trim()){ closeSettings(); doParse(); }
+    }else{
+      let extra = '';
+      if(d.parsed){
+        extra = '<br>本次解析到：' + escapeHtml((d.parsed.cookie_names || []).join(', ') || '（无有效项）') +
+          '，SESSDATA 长度 <b>' + (d.parsed.sessdata_length || 0) + '</b> 字符';
+      }
+      cfgMsg('err', escapeHtml(d.error || '保存失败') + extra);
+      forceBtn.style.display = 'inline-block';
+    }
+  }catch(e){
+    cfgMsg('err', '请求失败：' + escapeHtml(e.message || String(e)));
+  }finally{
+    saveBtn.disabled = forceBtn.disabled = false;
+  }
+}
+
+async function clearCfg(){
+  const btn = $('btnCfgClear');
+  // 两段式确认：第一次点击只「上膛」，4 秒内再点才真正执行
+  if(btn.dataset.armed !== '1'){
+    btn.dataset.armed = '1';
+    btn.textContent = '确认清除？';
+    btn.classList.add('danger');
+    setTimeout(() => {
+      if(btn.dataset.armed === '1'){
+        btn.dataset.armed = '0';
+        btn.textContent = '清除已保存';
+        btn.classList.remove('danger');
+      }
+    }, 4000);
+    return;
+  }
+  btn.dataset.armed = '0';
+  btn.textContent = '清除已保存';
+  btn.classList.remove('danger');
+  try{
+    const res = await fetch(API_BASE + '/api/bili/config', { method:'DELETE' });
+    const d = await res.json();
+    renderCfgStatus(d);
+    cfgMsg('warn', escapeHtml(d.warning || '已清除'));
+  }catch(e){
+    cfgMsg('err', '请求失败：' + escapeHtml(e.message || String(e)));
+  }
+}
+
+/* ---------------- 事件绑定 ---------------- */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.style.setProperty('--tab-color', PLATFORMS[tab.dataset.platform].color);
+  tab.onclick = () => {
+    const name = tab.dataset.platform;
+    if(PLATFORMS[name].disabled){
+      setPlatform(name, {keepInput:true});
+      return;
+    }
+    setPlatform(name);
+    input.focus();
+  };
+});
+
+// 粘贴/输入时自动识别平台并联动横条
+input.addEventListener('input', () => {
+  const detected = detectPlatform(input.value);
+  if(detected && detected !== platform && !PLATFORMS[detected].disabled){
+    setPlatform(detected, {keepInput:true});
+  }
+});
+
+btnParse.onclick = doParse;
+btnClear.onclick = () => {
+  input.value = ''; hideError(); result.style.display = 'none'; input.focus();
+};
+btnDemo.onclick = () => {
+  const conf = PLATFORMS[platform];
+  if(!conf.demo){
+    // 小红书没有通用示例：xsec_token 每条笔记独有且会过期，必须用用户自己复制的链接
+    if(conf.demoHint){ $('hint').textContent = conf.demoHint; }
+    return;
+  }
+  input.value = conf.demo; hideError();
+};
+input.addEventListener('keydown', e => {
+  if((e.ctrlKey || e.metaKey) && e.key === 'Enter') btnParse.click();
+});
+$('btnClearHistory').onclick = () => clearAllHistory($('btnClearHistory'));
+
+/* —— 账号设置面板 —— */
+$('btnSettings').onclick = openSettings;
+$('btnCfgSave').onclick = () => saveCfg(false);
+$('btnCfgForce').onclick = () => saveCfg(true);
+$('btnCfgClear').onclick = clearCfg;
+$('btnCfgClose').onclick = closeSettings;
+$('btnCfgX').onclick = closeSettings;
+
+// 设置弹窗内的分段切换
+document.querySelectorAll('#cfgSeg .seg').forEach(el => {
+  el.onclick = () => setCfgSeg(el.dataset.seg);
+});
+// TikTok 代理面板
+$('btnTtSave').onclick = saveTtCfg;
+$('btnTtClear').onclick = clearTtCfg;
+// 点遮罩空白处关闭；Esc 也关（弹窗里没有表单提交，不会有副作用）
+$('settingsModal').addEventListener('click', e => { if(e.target === $('settingsModal')) closeSettings(); });
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && $('settingsModal').classList.contains('show')) closeSettings();
+});
+
+setPlatform('douyin');
+loadHistory();
+// 未配置时这次调用不触发任何 B站 请求，配置过才会探一次 nav 用于点亮绿点
+loadCfgStatus();
+</script>
+</body>
+</html>

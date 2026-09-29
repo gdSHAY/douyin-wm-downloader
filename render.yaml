@@ -1,0 +1,42 @@
+# Render Blueprint —— 部署描述文件
+#
+# 用法：Render 控制台 → New + → Blueprint → 选中本仓库 → Apply。
+# Render 会读这个文件自动建服务；之后每次推送 main 都会自动重新部署
+# （autoDeploy: true，也就是「GitHub 部署」那半句的实现方式）。
+#
+# 为什么用 Docker 而不是 runtime: python
+# --------------------------------------
+# B站 高清是 DASH 音视频分离，要出**合成好的成片**必须有 ffmpeg，
+# 而 Render 的原生 Python 运行时不提供 root、装不了系统包。
+# 详见 Dockerfile 顶部注释。
+
+services:
+  - type: web
+    name: douyin-wm-downloader      # 会成为网址的一部分（<name>.onrender.com）；被占用就换个名字
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /
+
+    # 离国内最近的区域，延迟比默认（美国俄勒冈）低得多；TikTok 在新加坡可正常访问。
+    # 若 Render 提示该区域不支持免费实例，删掉这一行即用默认区域。
+    region: singapore
+
+    # 推送到 main 就自动重新部署 —— 改完代码 commit & push 即可上线，不用再点按钮
+    autoDeploy: true
+
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+      # ── 可选：B站 登录态 ───────────────────────────────────────────────
+      # 不配 = 480P/360P，但**是合流好的完整成片**（音视频已合并，可直接播放）。
+      # 想开 1080P/4K 再去 Render 控制台 → Environment 里加 BILI_SESSDATA。
+      #
+      # ⚠ 填之前想清楚两点：
+      #   1) 服务网址是**公开可访问**的，填了等于任何拿到链接的人都能用你的账号下高清；
+      #   2) 免费实例没有持久磁盘，重启后容器内写的东西全丢 —— 所以凭据只能走环境变量，
+      #      别指望在网页「设置」里填了能留住。
+      # sync: false = 值不进仓库，只在 Render 控制台里填。
+      # - key: BILI_SESSDATA
+      #   sync: false
