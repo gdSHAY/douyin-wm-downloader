@@ -1,0 +1,16 @@
+# 运行期数据 —— 可能含 B站 登录凭据，绝不能进仓库
+data/
+bili_config.json
+tiktok_config.json
+*.log
+
+# Python 中间产物
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 本地环境
+.venv/
+venv/
+.env
+.DS_Store
