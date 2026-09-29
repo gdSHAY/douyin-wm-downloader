@@ -68,7 +68,7 @@ PORT = int(os.environ.get("PORT", os.environ.get("DOUYIN_DL_PORT", "8787")))
 # 实际生效端口。main() 里若发现 8787 被占用会顺延，并写回这里（页面渲染时注入给前端）。
 ACTUAL_PORT = PORT
 # 监听地址。默认仅本机：打包给别人用时不会弹防火墙、也不会把服务暴露给同网段。
-# 云端部署走 `uvicorn server:app --host 0.0.0.0`（见 Procfile），不经过 main()，不受此项影响。
+# 云端部署走 `uvicorn server:app --host 0.0.0.0`（见 Dockerfile 的 CMD），不经过 main()，不受此项影响。
 HOST = (os.environ.get("HOST") or "127.0.0.1").strip()
 
 # 仅允许代理白名单内的媒体域名，避免服务被当作任意下载代理（SSRF 防护）
@@ -2065,7 +2065,7 @@ def main():
         except Exception:
             pass
     # 默认只绑本机：打包分发时不会弹防火墙、也不会把服务暴露给同网段。
-    # 云平台走 `uvicorn server:app --host 0.0.0.0`（见 Procfile），不经过这里。
+    # 云平台走 `uvicorn server:app --host 0.0.0.0`（见 Dockerfile 的 CMD），不经过这里。
     uvicorn.run(app, host=HOST, port=ACTUAL_PORT, log_level="warning")
 
 
