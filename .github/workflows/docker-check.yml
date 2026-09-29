@@ -102,6 +102,32 @@ jobs:
           print('      0 个可达才说明这个机房连不上 TikTok。')
           "
 
+      - name: 探测抖音高清通道（境外出口是否被风控）
+        # 同样**不阻塞**构建。抖音的「多档清晰度」依赖 /aweme/v1/web/aweme/detail/
+        # （带 a_bogus 签名 + 非登录态 ttwid）。这个接口对大机房 / 境外 IP 的风控更严，
+        # 一旦返回空响应体，服务就会降级到 share 页方案 —— 界面显示「降级通道 · 仅默认档」。
+        #
+        # 这条探测把「境外能不能用高清通道」变成一条可查的证据，而不是靠猜。
+        # 注意：GitHub runner 在 Azure、Render 在 AWS，机房不同，结论仍只能当参考。
+        continue-on-error: true
+        run: |
+          echo "--- 从容器里探抖音高清通道 ---"
+          docker run --rm multipldl:ci python -c "
+          import douyin_hd
+          client = douyin_hd.HDClient()
+          try:
+              detail = client.fetch_detail('6918273131559881997')
+              video = detail.get('video') or {}
+              gears = video.get('bit_rate') or []
+              print('高清通道可用：bit_rate 档数 = %d，作品 ratio = %s' % (len(gears), video.get('ratio')))
+              for g in gears:
+                  print('   %-40s %s' % (g.get('gear_name'), g.get('bit_rate')))
+              print()
+              print('小结：档数 > 0 就说明境外出口没被风控；为 0 或抛异常则部署后会降级。')
+          except Exception as exc:
+              print('高清通道不可用（部署后将降级为「仅默认档」）：%s: %s' % (type(exc).__name__, exc))
+          "
+
       - name: 清理
         if: always()
         run: docker rm -f smoke || true
