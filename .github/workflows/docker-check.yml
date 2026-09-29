@@ -72,18 +72,34 @@ jobs:
         # 这一条**不阻塞**构建：只用来回答「境外机房到底能不能直连 TikTok」。
         # 注意 GitHub runner 与 Render 不是同一家机房（前者 Azure，后者 AWS），
         # 结论只能当参考，不能当保证 —— 真结果以 Render 部署后的实测为准。
+        #
+        # 探三个地址，因为解析链路依赖**两个不同主机**：
+        #   www.tiktok.com  —— 拿视频页数据（首页 200 不代表视频页能拿）
+        #   vm./vt.tiktok.com —— 短链跳转，是「粘贴分享链接」这条主路径的第一步
+        # 少探一个，就可能出现「首页通、真下载挂」的假绿灯。
         continue-on-error: true
         run: |
           echo "--- 从容器里探 TikTok（模拟境外出口）---"
           docker run --rm multipldl:ci python -c "
           import requests
           ua = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-          for url in ['https://www.tiktok.com/', 'https://www.tiktok.com/api/']:
+          urls = [
+              'https://www.tiktok.com/',
+              'https://www.tiktok.com/player/api/v1/items?aid=1988',
+              'https://vm.tiktok.com/ZM6nQqQqQ/',
+          ]
+          ok = 0
+          for url in urls:
               try:
-                  r = requests.get(url, timeout=15, headers=ua)
-                  print('%-34s -> HTTP %s  %d bytes' % (url, r.status_code, len(r.content)))
+                  r = requests.get(url, timeout=15, headers=ua, allow_redirects=True)
+                  print('%-52s -> HTTP %s  %d bytes' % (url, r.status_code, len(r.content)))
+                  if r.status_code < 500:
+                      ok += 1
               except Exception as exc:
-                  print('%-34s -> %s: %s' % (url, type(exc).__name__, str(exc)[:90]))
+                  print('%-52s -> %s: %s' % (url, type(exc).__name__, str(exc)[:80]))
+          print()
+          print('小结：%d/%d 个地址可达。4xx 也算可达（说明 TCP+TLS 通了，是业务层拒绝）；' % (ok, len(urls)))
+          print('      0 个可达才说明这个机房连不上 TikTok。')
           "
 
       - name: 清理
