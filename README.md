@@ -1,256 +1,294 @@
-# 多平台无水印下载站
+<div align="center">
 
-粘贴一条分享链接，拿到可直接下载的直链 / 成片。支持 **抖音、B站、TikTok、小红书**。
+<h1>多平台无水印下载站</h1>
 
-后端 FastAPI + 单文件前端（无构建步骤），两种跑法：
+<b>抖音 · B站 · TikTok · 小红书</b><br>
+粘贴链接，一键解析<b>无水印视频</b> / <b>高清图集</b> / <b>动图（实况照片）</b>
 
-- **云端**：Docker 镜像部署到 Render，得到一个可点开的网址（本文件讲的就是它）
-- **本地**：`python server.py` 或打包成 exe / 安卓 APK
+**简体中文** | [English](./README.en.md)
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/gdSHAY/douyin-wm-downloader)
+<a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/gdSHAY/douyin-wm-downloader?style=flat-square&label=Release&color=ff4d6d" alt="Release"></a>
+<a href="../../releases"><img src="https://img.shields.io/github/downloads/gdSHAY/douyin-wm-downloader/total?style=flat-square&label=Downloads&color=ffd166" alt="Downloads"></a>
+<a href="../../stargazers"><img src="https://img.shields.io/github/stars/gdSHAY/douyin-wm-downloader?style=flat-square&label=Stars&color=06d6a0" alt="Stars"></a>
+<a href="../../forks"><img src="https://img.shields.io/github/forks/gdSHAY/douyin-wm-downloader?style=flat-square&label=Forks&color=4cc9f0" alt="Forks"></a>
+<a href="../../issues"><img src="https://img.shields.io/github/issues/gdSHAY/douyin-wm-downloader?style=flat-square&label=Issues" alt="Issues"></a>
 
-> 仓库是**私有**的：点这个按钮后 Render 会先让你用 GitHub 登录、授权它读本仓库，
-> 然后它读 `render.yaml` 自动建服务。不想用按钮就走下面第二节的手动流程，效果一样。
+<br>
 
-**你现在要做的 5 件事**（代码侧已全部就绪，以下都需要在 Render 网站上手点）：
+<a href="#-下载安装"><img src="https://img.shields.io/badge/平台-Windows-0078d4?style=flat-square&logo=windows&logoColor=white" alt="Windows"></a>
+<a href="#-下载安装"><img src="https://img.shields.io/badge/平台-Android-3ddc84?style=flat-square&logo=android&logoColor=white" alt="Android"></a>
+<img src="https://img.shields.io/badge/Python-3.12%2B-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python">
+<img src="https://img.shields.io/badge/许可证-保留所有权利-8b8b8b?style=flat-square" alt="License">
 
-1. 打开 <https://render.com> → **Get Started** → 用 **GitHub** 登录；
-2. 授权 Render 读这个仓库（可以只勾这一个）；
-3. 点上面那个 **Deploy to Render** 按钮；或自己走 **New + → Blueprint → 本仓库 Connect**；
-4. 填 Blueprint 名称、分支选 `main` → 点 **Deploy Blueprint**，等 **3–6 分钟**构建；
-5. 拿到 `https://xxx.onrender.com`，按[第二节第 5 步](#5-验证别只看首页)的表格逐项试。
+</div>
 
-> 🚫 **入口别走错**：不要从 `New + → Web Service` 建，也不要理会
-> 「Create a new Service → Choose service」那个 8 卡片的页面（Static Sites / Web Services / …）。
-> 那是**逐项手填**模式 —— Render 看到仓库里有 `requirements.txt`，会把 **Language 猜成 Python**，
-> 走 buildpack 就装不了 ffmpeg → **B站 出不了成片**，正好废掉本次部署的核心目标。
-> 「Docker 构建」这件事已经写进 `render.yaml`，走 Blueprint 才会自动带上。详见第二节第 3 步。
+---
 
-> 第 5 步里的 **B站「下载成片」** 和 **TikTok 解析** 是本次部署的两个核心目标，
-> 务必各试一次 —— 前者验证 ffmpeg 生效，后者验证境外直连生效。
+一个**本地运行**的多平台视频下载工具。把链接粘进输入框，自动识别平台、解析出**无水印**的视频 / 图集 / 动图，支持在线预览与保存到本地。
 
-### 这个仓库已经自动验证过什么
+界面是一个网页，但**服务跑在你自己的电脑或手机上**（`127.0.0.1`），不经过任何第三方服务器 —— 你的链接、下载内容、以及可选的 B站 登录凭据都只留在本机。
 
-每次推送到 `main`，CI（`.github/workflows/docker-check.yml`）会真跑一遍并给出结论：
+> ⚠️ **三个平台各有前提**，请先读 [各平台的前提条件](#️-各平台的前提条件重要)：
+> **TikTok 在中国大陆必须自备代理**（不挂代理取不到任何数据）；
+> **B站 要「能直接播放的成片」需要 ffmpeg**（Windows 版已内置）；
+> **小红书必须用 App 里「分享 → 复制链接」得到的完整链接**。
 
-| 验证项 | 说明 |
+## 🎬 它长什么样
+
+<div align="center">
+<img src="./docs/screenshot-result-zh.png" width="880" alt="解析结果">
+<br>
+<sub>粘一条抖音链接 → 自动识别平台、选中最高可用档位（720P H.265）、给出下载按钮</sub>
+</div>
+
+<br>
+
+<div align="center">
+<img src="./docs/screenshot-home-zh.png" width="880" alt="初始界面">
+<br>
+<sub>初始界面：顶部四个平台可手动切换，也可以直接粘链接让程序自己认</sub>
+</div>
+
+**「无水印」是实打实的差别**，不是宣传词。同一条小红书作品，左边是平台的播放流，右边是本工具取到的原图直链 —— 同一个位置（黄框内），左边有平台角标，右边是干净的：
+
+<div align="center">
+<img src="./docs/watermark-compare.png" width="620" alt="带水印 vs 无水印 对比">
+</div>
+
+<details>
+<summary>这张对比图的可复核依据</summary>
+
+两张素材都是 `540×960`。程序化扫描右下角区域（`x 461~524, y 911~941`）的亮像素（RGB 三项均 > 225）：
+
+| 图 | 亮像素数 |
 | --- | --- |
-| Docker 镜像能构建 | `docker build` 成功，依赖全部装得上 |
-| **ffmpeg 在镜像里可用** | `ffmpeg -version` 有输出 ← **B站 出成片的前提** |
-| 服务能在容器里启动 | uvicorn 正常监听 `$PORT`，首页返回 200 |
-| 端口注入正确 | 首页里 `__SERVICE_PORT__` 已被替换成实际端口 |
-| B站 合流能力接口正常 | `/api/bili/mux/capability` 正常响应（容器里如实报「不可用」，桌面/网页用 ffmpeg） |
-| **TikTok 在境外容器里可达** | 直连三个关键地址，实测 **3/3 可达**（明细见下面） |
+| 平台播放流 | **1241** 个（就是那枚「小红书」角标） |
+| 本工具直链 | **0** 个 |
 
-也就是说：**「镜像能不能构建、B站 能不能合流、TikTok 通不通」这三件最容易翻车的事，在你去点部署之前就已经验过了。**
+原始素材可在仓库历史中查看，扫描脚本是几行 PIL 代码，可自行复现。
 
-**TikTok 那一条的原始日志（CI 实测，容器内未配任何代理）：**
+</details>
 
-```
-https://www.tiktok.com/                              -> HTTP 200  370981 bytes
-https://www.tiktok.com/player/api/v1/items?aid=1988  -> HTTP 400  109 bytes
-https://vm.tiktok.com/ZM6nQqQqQ/                     -> HTTP 200  376278 bytes
+## 📥 下载安装
 
-小结：3/3 个地址可达
-```
+到 [**Releases**](../../releases/latest) 页面下载。两个包都**自带 Python 运行时**，不用先装环境。
 
-第二行**回 400 而不是超时**，是本条最有价值的信息：`/player/api/v1/items` 正是解析器
-实际调用的接口，400 说明 **TCP + TLS 通了、而且 TikTok 的应用层真的响应了**
-（只是参数被拒）。如果出口被挡，这里会是连接超时或 5xx。
+### Windows（推荐）
 
-> ⚠️ 仍需你实测一次：GitHub runner 在 Azure、Render 在 AWS，**机房不同**。
-> 上面的结论是「境外出口能直连」的强证据，但不是 Render 上的保证 —— 见第二节第 5 步。
+| | |
+| --- | --- |
+| 文件 | `multipldl-1.0.7-win64.zip`（≈ 74 MB，解压后 ≈ 162 MB） |
+| 依赖 | **零** —— Python 3.13 与 ffmpeg 都已打包在内 |
 
----
+1. 下载后**解压整个文件夹**（⚠️ 不要只把 `.exe` 单独拖出来，`_internal/` 是它的一部分）
+2. 双击 `多平台无水印下载站.exe`
+3. 浏览器会自动打开 `http://127.0.0.1:8787`；关掉那个黑色窗口 = 停止服务
 
-## 一、为什么云端要用 Docker
+> **杀毒软件报毒？** PyInstaller 打包的程序被 360 / 火绒 / 电脑管家误报是常见现象。
+> 把整个文件夹加入信任区即可。**不能接受就别用 —— 不要为了跑它去关掉杀毒软件。**
 
-**因为 B站 高清是「音视频分离」的（DASH）。** 平台把画面和声音给成两条流，
-要得到一条能直接播放的**成片**，必须用 ffmpeg 合流 —— 这是 `/api/bili/download` 做的事。
+### Android
 
-Render 的原生 Python 运行时不提供 root，装不了系统包；Docker 里 `apt-get install ffmpeg`
-一行就解决了。Dockerfile 顶部把这段原因也写了一遍，免得以后有人把它改回 `runtime: python`。
+| | |
+| --- | --- |
+| 文件 | `multipldl-1.0.7-arm64-v8a-debug.apk`（24.9 MB） |
+| 架构 | `arm64-v8a`（2017 年之后绝大多数手机） |
+| 签名 | **debug 签名**，安装时需允许「未知来源」；未做 release 签名 |
 
-服务代码本身**不需要改**：`find_ffmpeg()` 的查找顺序里包含 `shutil.which("ffmpeg")`
-和 `/usr/bin/ffmpeg`，apt 装的 ffmpeg 正好落在那里。
+界面与桌面版完全一致（同一份前端），解析能力也一致。B站 的高清合流在安卓上走系统 `MediaMuxer`，**不依赖 ffmpeg**。
 
-**「免费层能不能用 Docker」是这条路的前提，已核实**：官方定价页 Hobby 工作区在
-Build & Deploy 下明确勾选了 **Docker builds**，Compute 里也列了 **Custom Docker containers**。
-不需要信用卡，512 MB / 0.1 CPU 的免费实例照样能跑 Docker 服务。
-
----
-
-## 二、部署到 Render（5 分钟）
-
-### 1. 注册
-
-打开 <https://render.com> → 点 **Get Started** → 选 **GitHub** 登录（不需要信用卡）。
-
-### 2. 授权仓库
-
-第一次进控制台会让你 **Connect GitHub**，授权时可以只勾这一个仓库（更安全）。
-若仓库是私有的，Render 也能通过这个授权读到。
-
-### 3. 新建 Blueprint
-
-> ⚠️ **先确认入口对**：是控制台右上角 **New +** 菜单里的 **Blueprint**。
-> 如果你看到的界面是「Create a new Service → Choose service」那 8 个卡片
-> （Static Sites / Web Services / Private Services / Background Workers / Cron Jobs / …），
-> **说明已经走错了** —— 那是手填模式，里面**没有** Blueprint 卡片。退回去重新点 **New +**。
-
-- 控制台右上角 **New +** → **Blueprint**
-- 在仓库列表里点本仓库那一行的 **Connect**（私有仓库要先授权，见上一步）
-- 填 **Blueprint 名称**，**分支选 `main`**
-- Render 读到仓库根目录的 `render.yaml`，列出将要创建的资源（一个 `type: web` 服务）
-- 点 **Deploy Blueprint**（老版界面叫 **Apply** / **Create Resources**）
-
-服务名、区域 `singapore`、Docker 构建方式、Free 实例类型**都写在 `render.yaml` 里，不用手填**。
-
-> 万一 `render.yaml` 有问题，这一步会直接把错误列出来、**不会创建任何东西** ——
-> 比「建完服务再报错」好排查得多。
-
-### 4. 等构建
-
-首次构建要装 ffmpeg + Python 依赖，大约 **3–6 分钟**。在服务的 **Logs** 页能看到：
-
-```
-[build] ffmpeg 已就绪
-...
-==> Running 'uvicorn server:app --host 0.0.0.0 --port 10000'
-INFO:     Uvicorn running on http://0.0.0.0:10000
-```
-
-看到这两行就成功了。页面上方会给出网址：`https://<服务名>.onrender.com`。
-
-### 5. 验证（别只看首页）
-
-首页能打开不代表能用 —— 按这条顺序试，才能证明「解析 → 下载」整条链路通：
-
-| 步骤 | 操作 | 期望 |
-| --- | --- | --- |
-| 1 | 打开网址 | 页面正常显示，无脚本报错 |
-| 2 | 粘一条**抖音**分享链接 → 解析 | 出标题、封面、档位列表 |
-| 3 | 点下载 | 拿到 mp4，能播放 |
-| 4 | 切到 **B站**，粘一条视频链接 → 解析 | 出标题与清晰度列表（未登录通常 480P/360P） |
-| 5 | 点「下载成片」 | 得到**已合流的 mp4**（有声音）—— 这条能过，说明 ffmpeg 生效了 |
-| 6 | 切到 **TikTok** 粘链接 → 解析 | 境外机房通常可直连；若失败见下面「排查」 |
-| 7 | 切到 **小红书** 粘分享链接 | 出图文列表 |
-
----
-
-## 三、免费实例的限制（先知道，少走弯路）
-
-数据来自 <https://render.com/pricing>（Hobby 工作区）与 <https://render.com/docs/free>（2026-09-30 核）。
-
-| 限制 | 具体表现 | 怎么办 |
-| --- | --- | --- |
-| **15 分钟无流量会休眠** | 下次请求要等约 **1 分钟**冷启动（页面会显示 Render 的加载页） | 自己用时点一下等一会；不想等就升到 $7/月（不休眠） |
-| **带宽 5 GB / 月** | B站 一条 1080P 成片可能几百 MB，下一个就吃掉几 % | 够个人用；分享给很多人用会超。超了当月服务会被暂停 |
-| **0.1 CPU / 512 MB** | 长视频 / 4K 合流会比较慢（合流是 IO 密集，一般不会 OOM） | 短视频无感；4K 长片耐心等或升配 |
-| **构建 500 分钟 / 月** | Docker 构建一次约 3–6 分钟 → 约 **80–160 次/月** | 日常够用；频繁 push 会耗尽，注意别把 main 当草稿分支 |
-| **750 实例小时 / 月**（全工作区共享） | 一个服务 24h 常驻约吃 720 小时 | 免费实例会休眠，实际远低于此；别同时跑多个免费服务 |
-| **不能挂持久磁盘** | 重启后容器里写的东西全没 | 配置走环境变量（见下），别指望落盘 |
-| **自定义域名 2 个** | 超出要 $0.25/个/月 | 个人用 `*.onrender.com` 就够 |
-
-另外两条**与本项目相关**的官方条款，得如实说一下：
-
-> ⚠️ **服务主动外发流量的阈值**（官方 free 文档 "Service-initiated traffic threshold"）：
-> Render 可能暂停**主动向公网发起异常高流量**的免费服务。
-> 本项目恰好是「服务端去 CDN 拉大文件再转给你」这种形态 —— 个人正常使用量远够不着阈值，
-> 但**别把它当成可以公开大范围分享的下载站**。
->
-> ⚠️ **不收信用卡也会被暂停**：带宽或构建分钟用超后，若账号里没有付款方式，
-> Render 会**直接暂停免费服务**到月底，而不是先账单提醒。所以用量要在
-> Billing → Monthly Included Usage 里盯一眼。
-
----
-
-## 四、环境变量（都在 Render 控制台 → Environment 配）
-
-| 变量 | 作用 | 要不要配 |
-| --- | --- | --- |
-| `BILI_SESSDATA` | B站 登录态。配上才能下 1080P/4K | 可选 |
-| `TIKTOK_PROXY` | TikTok 代理。`http://host:port` | 境外机房一般不用配 |
-
-### 关于 `BILI_SESSDATA`
-
-不配也能用 —— **480P/360P，但依然是合流好的成片**（音视频完整、能直接播放）。
-
-⚠️ 配之前请想清楚：**服务网址是公开可访问的**。填了你的 SESSDATA，
-等于任何拿到链接的人都能用你的账号下载高清。要开高清，建议先把访问控制做好。
-
-### 关于 `TIKTOK_PROXY`
-
-TikTok 官方接口在**中国大陆的网络**里无法直连（DNS 能解析、TCP 443 超时）。
-Render 的机房在境外，**直连就应该能用，这一项留空即可**。
-
-> **证据**：CI 在境外容器里（未配任何代理）直连实测 **3/3 地址可达**，
-> 其中解析器真正调用的 `/player/api/v1/items` 返回 400（应用层已响应，非网络不通）。
-> 明细见本文开头的日志块。
->
-> ⚠️ 保留一条限定：GitHub runner 在 Azure、Render 在 AWS，**机房不同**，
-> 结论是强证据而非保证。请按第二节第 5 步实测一次 —— 若你在 Render 的 Logs 里
-> 看到类似 `直连（没有探测到可用的 TikTok 代理）` 的说明，就说明它走了预期路径。
-
-如果 TikTok 解析仍失败，说明该机房出口被挡了：
-
-1. **换区域**：`render.yaml` 里 `region` 可设为 `oregon` / `ohio` / `virginia` /
-   `frankfurt` / `singapore`（本方案默认 `singapore`）。
-   ⚠️ **区域创建后不可修改** —— 要换只能**新建一个服务**（选另一个区域），
-   控制台里没有「改区域」的按钮，别去找。
-2. 或填一个**公网可达**的代理地址 —— 注意不能写 `127.0.0.1`，
-   那在服务器上指的是它自己，必然连不通
-
----
-
-## 五、改代码后怎么重新上线
-
-`render.yaml` 里 `autoDeploy: true` 已经开了自动部署：
+### 从源码运行
 
 ```bash
-# 改完代码，推送到 main 分支
-git push origin main
-```
-
-Render 检测到推送就会自动重建、重新部署，**网址不变**。
-
-如果你在本地维护的是另一个目录结构，注意**服务代码是「扁平」放在仓库根的**
-（`server.py` 与 `static/` 同级），不是放在子目录里 —— 这跟 `uvicorn server:app` 的
-导入方式有关。
-
----
-
-## 六、排查
-
-| 现象 | 多半是 | 怎么确认 |
-| --- | --- | --- |
-| 部署失败，日志里 `apt-get` 报错 | 镜像源临时抽风 | 在 Render 点 **Manual Deploy → Clear build cache & deploy** |
-| 部署成功但访问 502 | 端口没起来 | 看日志有没有 `Uvicorn running on http://0.0.0.0:`；`PORT` 必须是 `$PORT` 展开的（见 Dockerfile 注释） |
-| 首页能开，但点解析没反应 | 前端把请求打到 `127.0.0.1` 了 | 打开浏览器 F12 → Network，看请求域名。正常应是当前网址（相对路径） |
-| B站 解析成功、下载报「未找到 ffmpeg」 | ffmpeg 没进最终镜像 | 看构建日志有没有 `[build] ffmpeg 已就绪`；有的话进服务 Shell 跑 `ffmpeg -version` |
-| B站 下载 400「不支持代理该域名」 | 直链主机不在白名单 | 换一条视频试；仍失败请提 issue，附上报错里的完整域名 |
-| TikTok 报 SSL / 连接失败 | 机房出口被挡 | 见上面「关于 TIKTOK_PROXY」 |
-| 下载到一半断了 | 免费实例的请求时长或带宽限制 | 换小一点的档位；免费实例不适合下超大文件 |
-
----
-
-## 七、本地跑（不部署也能用）
-
-```bash
+git clone https://github.com/gdSHAY/douyin-wm-downloader.git
+cd douyin-wm-downloader
 pip install -r requirements.txt
-python server.py            # 默认 http://127.0.0.1:8787，会自动开浏览器
-python server.py --no-browser
+python server.py
 ```
 
-本地跑 B站 成片同样需要 ffmpeg：Windows 装完把 `ffmpeg.exe` 放进 PATH，
-或设环境变量 `FFMPEG_PATH` 指向它。
+浏览器打开 `http://127.0.0.1:8787`。（`python server.py --no-browser` 可不让它自动开浏览器。）
 
-本地跑 TikTok 需要代理（大陆网络无法直连），在页面右上角 **⚙ 设置 → TikTok 代理** 里填，
-或开着 Clash / FlClash（默认 7890）让程序自动探测。
+如果 8787 被占用，会自动顺延到 8788 等端口，以控制台打印的地址为准。
 
----
+## ✨ 四个平台各能拿到什么
 
-## 许可
+| 平台 | 视频 | 图集 | 最高清晰度 | 还支持 |
+| --- | --- | --- | --- | --- |
+| **抖音** | ✅ 无水印 mp4 | ✅ 原图 | 最高 1440P（**受作品本身上限约束**） | 实况照片（静态图 + 动态视频）、封面、多档切换 |
+| **B站** | ✅ DASH 合流 mp4 | — | 未登录 480P / 登录后可达 4K | 分 P、音频 MP3、弹幕 XML、封面、本机合流兜底 |
+| **TikTok** | ✅ 无水印 mp4 | — | **最高 4K 60fps** | 按分辨率 → 帧率 → 码率自动选档、封面 |
+| **小红书** | ✅ 无水印 mp4 | ✅ 高清原图 | 原图 / 原片 | 动图（Live Photo）、打包下载全部 |
 
-仅供个人学习与备份自己有权保存的内容使用。请遵守各平台的服务条款与著作权法，
-不要用于传播他人作品。
+顶部横条可手动切平台；直接粘贴链接则由前后端自动识别并联动切换。切换平台会清空输入与结果（避免串台），历史记录按平台分开保存。
+
+## ⚙️ 三步开始用
+
+1. **选平台**（或直接粘链接让它自己认）
+2. **粘贴** —— 分享短链、网页长链、或 App 里「复制链接」得到的那一整段带中文的分享文案，都能识别
+3. **点「开始解析」** → 预览 → 点下载
+
+**支持的链接形态**
+
+| 平台 | 可接受的写法 |
+| --- | --- |
+| 抖音 | `https://v.douyin.com/xxxxx/`（短链）、`https://www.douyin.com/video/<id>`、`https://www.douyin.com/note/<id>`、含链接的整段分享文案 |
+| B站 | `https://www.bilibili.com/video/BV...`、`https://b23.tv/xxxxx`、含分 P 的 `?p=2` |
+| TikTok | `https://www.tiktok.com/@user/video/<id>`、短链 `https://vm.tiktok.com/xxxxx/` |
+| 小红书 | **必须**是 App「分享 → 复制链接」得到的完整链接（含 `xsec_token`），纯笔记 ID 会被平台拒绝 |
+
+## ⚠️ 各平台的前提条件（重要）
+
+这几条**不是工具的局限，是平台的限制**，逐条都有实测记录。
+
+### TikTok 在中国大陆需要代理
+
+实测：DNS 能解析出 IP，但 TCP 443 超时。**不挂代理取不到任何数据**（不是「慢」或「偶尔失败」，是必然失败）。
+
+点页面右上角「设置 → TikTok 代理」，填本机代理地址（Clash / FlClash 一般是 `http://127.0.0.1:7890`），再点「保存并检测」，看到「可连 TikTok」即可。
+
+> 部署在**境外服务器**上时反之 —— 直连即可，代理留空。
+
+### B站 出「成片」需要 ffmpeg
+
+B站 高清是 **DASH 音视频分离**（视频轨、音频轨是两条独立流）。要交付一个能直接播放的 mp4，必须服务端合流，因此依赖 ffmpeg。
+
+- **Windows 版已内置 ffmpeg**，开箱可用。
+- 从源码跑：装好 ffmpeg 并确保在 `PATH` 里；或设环境变量 `FFMPEG_PATH`。
+- **找不到 ffmpeg 时不会静默给你一个没声音的文件** —— 界面会降级为「视频轨 / 音频轨分别下载」，并给出合流命令。
+
+### B站 清晰度取决于账号
+
+| 清晰度 | 前提 |
+| --- | --- |
+| 360P / 480P | 无需登录（**未登录实测上限 = 480P**） |
+| 720P / 1080P / 1080P60 / 4K | 需要登录（`SESSDATA`） |
+
+点页面右上角「⚙ 账号设置」，把**导出的 `cookies.txt` 全文**或 `SESSDATA=xxx` 粘进去即可。保存时会先向 B站 校验登录态，通过了才落盘 —— 一份复制不全的 Cookie 不会把原本可用的配置顶掉。
+
+> 🔒 `SESSDATA` 等同于账号登录态。工具只把它用于请求该账号有权观看的清晰度，**不外传、不上传**。
+> 网页的设置面板只回传打码值（形如 `3bee…IIEC`）与长度，任何接口都不返回明文。
+> 也正因如此，本仓库的 `.gitignore` 明确排除了 `bili_config.json` —— **不要把它提交上来**。
+
+**实测澄清（2026-09）**：用一个会员早已过期的普通登录账号，同一个视频拿到了 `4K / 1080P60 / 1080P / 720P` 共 6 档；同一链接未登录时只有 480P + 360P。所以「4K 必须大会员」这个说法**不成立**。本工具只以 `dash.video` 里**真实存在的轨道**为准，不信 `vipStatus` 字段。
+
+### 小红书必须带 `xsec_token`
+
+纯笔记 ID 的链接会被平台拒绝（实测返回「你访问的页面不见了」、内嵌数据为空）。**必须用 App 里「分享 → 复制链接」得到的完整链接。**
+
+### 抖音「为什么没有更高清」
+
+两个原因，按顺序排查：
+
+1. **作品本身的上限。** 抖音竖屏视频大量是 720P，只有部分新作品有 1080P / 2K / 4K。解析结果里的档位来自平台返回的数据，源就是 720p 的话，任何工具都变不出 4K。
+2. **取流通道被风控降级。** 抖音有两条取流路径：带签名的**高清通道**（多档可选）和不签名的**降级通道**（只有一档「默认」）。界面上会直接标出你走的是哪条。机房 IP（尤其境外）更容易被降级。
+
+降级通道给出的**仍然是无水印视频**，只是没有档位可选。想知道具体原因，按 `F12` 看 `/api/parse` 响应里的 `hd_error` 字段 —— 后端会如实写明是「接口返回空数据（可能已触发风控）」还是网络超时。
+
+## 🧱 技术栈
+
+| | |
+| --- | --- |
+| 后端 | Python + [FastAPI](https://fastapi.tiangolo.com/) + Uvicorn（单进程本地服务） |
+| 前端 | 单文件原生 HTML / JS，**无构建步骤**，由后端直接渲染注入端口 |
+| 网络 | `requests`、`curl_cffi`（小红书需要伪装 TLS 指纹）、`gmssl`（抖音签名） |
+| 媒体 | ffmpeg（B站 合流，Windows 版内置） / Android `MediaMuxer` |
+| 打包 | PyInstaller（Windows）/ Buildozer + python-for-android（Android，云端构建） |
+
+## 🗂 项目结构
+
+```
+server.py              FastAPI 后端：路由、解析编排、下载代理、本机保存
+static/index.html      前端界面（单文件，无构建）
+douyin_parser.py       抖音解析（含风控降级判定）
+douyin_hd.py           抖音高清通道：档位选择
+douyin_abogus.py       抖音 a_bogus 签名
+bili_parser.py         B站 解析（清晰度、分P、弹幕）
+dash_muxer.py          B站 DASH 合流（调 ffmpeg）
+tiktok_parser.py       TikTok 解析（多档选择 + 直链换链重试）
+xhs_parser.py          小红书解析（原图 / 动图）
+disk_saver.py          服务端落盘：任务队列、进度、取消
+runtime_paths.py       路径工具（区分源码 / exe / APK 三种运行形态）
+requirements.txt       依赖清单
+使用说明.txt            随压缩包分发的快速上手说明
+docs/                  README 用的截图
+```
+
+## 🔌 REST API
+
+界面不是必须的 —— 服务本身就是一套 HTTP 接口，`python server.py` 之后可以直接调。
+
+| 方法 | 路径 | 作用 |
+| --- | --- | --- |
+| `POST` | `/api/parse` | 解析链接，返回标题、封面、档位、直链 |
+| `GET` | `/api/download` | 代理下载（带 Referer / UA，避免 403） |
+| `GET` | `/api/bili/tracks` | B站 可用的视频/音频轨与清晰度列表 |
+| `GET` | `/api/bili/download` | B站 合流成片（需要 ffmpeg） |
+| `GET` | `/api/bili/danmaku` | 弹幕 XML |
+| `POST` | `/api/save` | 服务端下载并落盘（带进度） |
+| `GET` | `/api/proxy` | 查询当前 TikTok 代理探测结果 |
+
+交互式接口文档：服务起来后打开 `http://127.0.0.1:8787/docs`。
+
+## ❓ 常见问题
+
+<details>
+<summary><b>双击后窗口一闪就没了 / 浏览器没反应</b></summary>
+
+不能只把 `.exe` 拖到别处单独运行，**必须和 `_internal/` 文件夹待在一起**。另外看窗口里打印的地址 —— 8787 被占用时会自动顺延到 8788 等端口。
+</details>
+
+<details>
+<summary><b>B站 下载下来没声音</b></summary>
+
+说明 ffmpeg 没找到，你拿到的是分离的视频轨。用 **Windows 压缩包版**（内置 ffmpeg）即可；源码运行时请装 ffmpeg 或设 `FFMPEG_PATH`。界面上如果提示「视频轨 / 音频轨分别下载」，就是这种情况。
+</details>
+
+<details>
+<summary><b>TikTok 能解析出来，但每条下载都 403 / 502</b></summary>
+
+看错误文案里的**状态码**和括号内容，它写明了这次是经谁去取的：
+
+- **403 且域名含 `webapp-prime`** → 该媒体主机被 TikTok 边缘节点拒了。新版会自动换同一档位的其它直链；若仍失败，说明当前代理节点被挡，换个节点。
+- **502 且域名是 `tiktokcdn-us.com` / `tiktokv.com`** → 域名没问题，是代理软件转发失败。确认它的分流规则覆盖了 TikTok 的 CDN 域名，或临时切「全局」模式。
+- **括号里是「直连」** → 代理没生效。回「设置 → TikTok 代理」点「保存并检测」。
+</details>
+
+<details>
+<summary><b>我填的设置下次打开还在吗</b></summary>
+
+在。设置存在程序同目录的 `data/`（源码运行时是 `bili_config.json` / `tiktok_config.json`），别删。整个文件夹拷到别的电脑，设置也跟着走。
+</details>
+
+<details>
+<summary><b>下载很慢</b></summary>
+
+最高档可能是几百 MB，属正常。在清晰度下拉里选低一档会快很多。
+</details>
+
+## 📄 合规与免责
+
+- 视频与图片的**著作权归原作者及平台所有**。
+- 请仅用于**个人学习与技术交流**，不要用于商业或侵权用途；下载内容请在 **24 小时内删除**。
+- 擅自下载、传播他人作品可能违反平台服务协议及相关法律法规，**风险由使用者自行承担**。
+- 本工具不绕过任何付费内容：能拿到什么清晰度由平台与你的账号权限决定。
+
+## 📮 联系
+
+| | |
+| --- | --- |
+| 问题反馈 | [Issues](../../issues) |
+| 仓库 | <https://github.com/gdSHAY/douyin-wm-downloader> |
+
+## ⭐ Star 历史
+
+<a href="https://star-history.com/#gdSHAY/douyin-wm-downloader&Timeline">
+  <img src="https://api.star-history.com/svg?repos=gdSHAY/douyin-wm-downloader&type=Timeline" alt="Star History" width="620">
+</a>
+
+## 📄 许可
+
+本仓库**未附带开源许可证**（All rights reserved）。你可以自由下载与使用发行版；如需在其它项目中复用代码或商用，请先通过 Issues 联系作者。
+
+<div align="center">
+<sub>本 README 采用「<a href="./README.en.md">简体中文</a> / English」双语，可用顶部链接切换。</sub>
+</div>
