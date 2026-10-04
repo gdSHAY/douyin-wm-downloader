@@ -741,7 +741,9 @@ def _parse_tiktok(text: str):
     except Exception as exc:
         return _error(f"解析异常：{type(exc).__name__}: {exc}", "tiktok")
 
-    if not data.get("qualities"):
+    # 两条合法出路：视频（qualities）与图文帖（images）。
+    # 图文帖走的是同一套「images / image_items」契约，ZIP 打包与前端渲染可直接复用。
+    if not data.get("qualities") and not data.get("images"):
         return _error(data.get("hint") or "未获取到可下载的清晰度", "tiktok")
 
     # TikTok 的播放源是「音视频合一的渐进式 mp4」，单条直链即可播放，

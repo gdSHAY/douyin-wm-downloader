@@ -49,6 +49,12 @@ The UI is a web page, but the **server runs on your own machine** (`127.0.0.1`).
 <sub>Initial UI: switch platforms with the top bar, or just paste a link and let the app detect it</sub>
 </div>
 
+<div align="center">
+<img src="./docs/screenshot-tiktok-photo-zh.png" width="880" alt="TikTok photo post result">
+<br>
+<sub>TikTok <b>photo post (Photo Mode)</b>: the whole set of watermark-free originals listed at once — download individually or zip them in one click</sub>
+</div>
+
 <sub>The UI is currently Chinese-only; this README is bilingual.</sub>
 
 **"Watermark-free" is a real, measurable difference** — not marketing. Below: the same Xiaohongshu post. Left is the platform's playback stream, right is the original CDN link this tool resolves. Inside the yellow box (identical coordinates), the left has a platform badge and the right is clean:
@@ -78,7 +84,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.7-win64.zip` (≈ 74 MB, ≈ 162 MB unpacked) |
+| File | `multipldl-1.0.8-win64.zip` (≈ 77 MB, ≈ 166 MB unpacked) |
 | Dependencies | **None** — Python 3.13 and ffmpeg are bundled |
 
 1. **Extract the whole folder** (⚠️ do *not* drag the `.exe` out on its own — `_internal/` is part of it)
@@ -91,7 +97,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.7-arm64-v8a-debug.apk` (24.9 MB) |
+| File | `multipldl-1.0.8-arm64-v8a-debug.apk` (23.8 MB) |
 | ABI | `arm64-v8a` (virtually every phone since 2017) |
 | Signing | **debug-signed** — you must allow installs from unknown sources; no release signing yet |
 
@@ -116,7 +122,7 @@ If port 8787 is taken the server moves on to 8788 and so on — trust the addres
 | --- | --- | --- | --- | --- |
 | **Douyin** | ✅ watermark-free mp4 | ✅ originals | up to 1440P (**capped by the post itself**) | Live Photos (still + motion), cover, quality picker |
 | **Bilibili** | ✅ DASH-muxed mp4 | — | 480P anonymous / up to 4K signed in | multi-part, MP3 audio, danmaku XML, cover, local-mux fallback |
-| **TikTok** | ✅ watermark-free mp4 | — | **up to 4K 60fps** | auto-picks by resolution → fps → bitrate, cover |
+| **TikTok** | ✅ watermark-free mp4 | ✅ watermark-free photos | **up to 4K 60fps** | photo posts (Photo Mode) with one-click zip, auto-picks by resolution → fps → bitrate, cover, original audio |
 | **Xiaohongshu** | ✅ watermark-free mp4 | ✅ hi-res originals | originals / source video | Live Photos, download-all-as-ZIP |
 
 Switch platforms with the top bar, or just paste a link and let the app detect it. Switching clears the input and result (so platforms never get mixed up); history is kept per platform.
@@ -133,7 +139,7 @@ Switch platforms with the top bar, or just paste a link and let the app detect i
 | --- | --- |
 | Douyin | `https://v.douyin.com/xxxxx/`, `https://www.douyin.com/video/<id>`, `https://www.douyin.com/note/<id>`, or the whole share message |
 | Bilibili | `https://www.bilibili.com/video/BV...`, `https://b23.tv/xxxxx`, including `?p=2` for multi-part |
-| TikTok | `https://www.tiktok.com/@user/video/<id>`, short link `https://vm.tiktok.com/xxxxx/` |
+| TikTok | `https://www.tiktok.com/@user/video/<id>`, `https://www.tiktok.com/@user/photo/<id>`, short links `https://www.tiktok.com/t/xxxxx/` and `https://vm.tiktok.com/xxxxx/` |
 | Xiaohongshu | **must** be the full link from Share → Copy Link (contains `xsec_token`) — a bare note ID is rejected by the platform |
 
 ## ⚠️ Platform prerequisites (important)
@@ -204,7 +210,7 @@ douyin_hd.py           Douyin HD channel: quality selection
 douyin_abogus.py       Douyin a_bogus signature
 bili_parser.py         Bilibili parsing (qualities, parts, danmaku)
 dash_muxer.py          Bilibili DASH muxing (drives ffmpeg)
-tiktok_parser.py       TikTok parsing (multi-quality + CDN retry)
+tiktok_parser.py       TikTok parsing (video qualities + photo posts + CDN retry)
 xhs_parser.py          Xiaohongshu parsing (originals / Live Photos)
 disk_saver.py          Server-side saving: job queue, progress, cancel
 runtime_paths.py       Path helper (source vs exe vs APK runtime shapes)

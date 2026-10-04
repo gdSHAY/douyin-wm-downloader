@@ -49,6 +49,14 @@
 <sub>初始界面：顶部四个平台可手动切换，也可以直接粘链接让程序自己认</sub>
 </div>
 
+<br>
+
+<div align="center">
+<img src="./docs/screenshot-tiktok-photo-zh.png" width="880" alt="TikTok 图文帖解析结果">
+<br>
+<sub>TikTok <b>图文帖（Photo Mode）</b>：整组无水印原图一次列出，可单张下载，也可一键打包成 ZIP</sub>
+</div>
+
 **「无水印」是实打实的差别**，不是宣传词。同一条小红书作品，左边是平台的播放流，右边是本工具取到的原图直链 —— 同一个位置（黄框内），左边有平台角标，右边是干净的：
 
 <div align="center">
@@ -77,7 +85,7 @@
 
 | | |
 | --- | --- |
-| 文件 | `multipldl-1.0.7-win64.zip`（≈ 74 MB，解压后 ≈ 162 MB） |
+| 文件 | `multipldl-1.0.8-win64.zip`（≈ 77 MB，解压后 ≈ 166 MB） |
 | 依赖 | **零** —— Python 3.13 与 ffmpeg 都已打包在内 |
 
 1. 下载后**解压整个文件夹**（⚠️ 不要只把 `.exe` 单独拖出来，`_internal/` 是它的一部分）
@@ -91,7 +99,7 @@
 
 | | |
 | --- | --- |
-| 文件 | `multipldl-1.0.7-arm64-v8a-debug.apk`（24.9 MB） |
+| 文件 | `multipldl-1.0.8-arm64-v8a-debug.apk`（23.8 MB） |
 | 架构 | `arm64-v8a`（2017 年之后绝大多数手机） |
 | 签名 | **debug 签名**，安装时需允许「未知来源」；未做 release 签名 |
 
@@ -116,7 +124,7 @@ python server.py
 | --- | --- | --- | --- | --- |
 | **抖音** | ✅ 无水印 mp4 | ✅ 原图 | 最高 1440P（**受作品本身上限约束**） | 实况照片（静态图 + 动态视频）、封面、多档切换 |
 | **B站** | ✅ DASH 合流 mp4 | — | 未登录 480P / 登录后可达 4K | 分 P、音频 MP3、弹幕 XML、封面、本机合流兜底 |
-| **TikTok** | ✅ 无水印 mp4 | — | **最高 4K 60fps** | 按分辨率 → 帧率 → 码率自动选档、封面 |
+| **TikTok** | ✅ 无水印 mp4 | ✅ 无水印原图 | **最高 4K 60fps** | 图文帖（Photo Mode）整组打包、按分辨率 → 帧率 → 码率自动选档、封面、原声 |
 | **小红书** | ✅ 无水印 mp4 | ✅ 高清原图 | 原图 / 原片 | 动图（Live Photo）、打包下载全部 |
 
 顶部横条可手动切平台；直接粘贴链接则由前后端自动识别并联动切换。切换平台会清空输入与结果（避免串台），历史记录按平台分开保存。
@@ -133,7 +141,7 @@ python server.py
 | --- | --- |
 | 抖音 | `https://v.douyin.com/xxxxx/`（短链）、`https://www.douyin.com/video/<id>`、`https://www.douyin.com/note/<id>`、含链接的整段分享文案 |
 | B站 | `https://www.bilibili.com/video/BV...`、`https://b23.tv/xxxxx`、含分 P 的 `?p=2` |
-| TikTok | `https://www.tiktok.com/@user/video/<id>`、短链 `https://vm.tiktok.com/xxxxx/` |
+| TikTok | `https://www.tiktok.com/@user/video/<id>`、`https://www.tiktok.com/@user/photo/<id>`、短链 `https://www.tiktok.com/t/xxxxx/` 与 `https://vm.tiktok.com/xxxxx/` |
 | 小红书 | **必须**是 App「分享 → 复制链接」得到的完整链接（含 `xsec_token`），纯笔记 ID 会被平台拒绝 |
 
 ## ⚠️ 各平台的前提条件（重要）
@@ -204,7 +212,7 @@ douyin_hd.py           抖音高清通道：档位选择
 douyin_abogus.py       抖音 a_bogus 签名
 bili_parser.py         B站 解析（清晰度、分P、弹幕）
 dash_muxer.py          B站 DASH 合流（调 ffmpeg）
-tiktok_parser.py       TikTok 解析（多档选择 + 直链换链重试）
+tiktok_parser.py       TikTok 解析（视频多档 + 图文帖 + 直链换链重试）
 xhs_parser.py          小红书解析（原图 / 动图）
 disk_saver.py          服务端落盘：任务队列、进度、取消
 runtime_paths.py       路径工具（区分源码 / exe / APK 三种运行形态）

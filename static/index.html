@@ -1005,6 +1005,75 @@ const MEDIA_DEFAULTS = {
   authorFallback: '抖音用户'
 };
 
+/* 图集渲染（抖音 / 小红书 / TikTok 图文帖 共用）
+   抽成独立函数的原因：三个平台共用同一份「images / image_items」契约，
+   若各写一遍，改一处必漏两处。返回 true 表示本次渲染了图集。 */
+function renderImageBox(d, opt){
+  const box = $('imgsBox');
+  if(!d.images || !d.images.length){ box.innerHTML = ''; return false; }
+
+  const items = (Array.isArray(d.image_items) && d.image_items.length)
+    ? d.image_items
+    : d.images.map((u,i) => ({index:i+1, url:u}));
+  const liveCount = items.filter(it => it.live && it.live.url).length;
+
+  let figMeta = '共 ' + items.length + ' 张 · 无水印原图（最高清变体）';
+  if(liveCount) figMeta += ' · <span class="hi">含 ' + liveCount + ' 段' + opt.liveLabel + '动态视频</span>';
+  if(opt.liveMissingHint !== false && d.live_maybe_missing) figMeta += '（本次未能走高清通道，' + opt.liveLabel + '动态可能缺失，请稍后重试）';
+
+  // 打包条目：图片与实况动态视频混排，文件名在 ZIP 内用 ASCII 以免解压乱码
+  const zipEntries = [];
+  items.forEach(it => {
+    if(it.url) zipEntries.push({url: it.url, name: d.filename+'_'+padIdx(it.index)+'.jpg'});
+    if(it.live && it.live.url) zipEntries.push({url: it.live.url, name: d.filename+'_'+padIdx(it.index)+'_live.mp4'});
+  });
+  const zipLabel = items.length + ' 张' + (liveCount ? ' + ' + liveCount + ' 段' + opt.liveLabel : '');
+
+  box.innerHTML =
+    '<div class="fig-meta">' + figMeta + '</div>' +
+    '<div class="imgs">' + items.map(it => {
+      const live = (it.live && it.live.url) ? it.live : null;
+      const thumb = it.url || d.cover || '';
+      return '<figure><img src="'+proxy(thumb)+'" loading="lazy" alt="图'+it.index+'">'+
+        (it.url ? '<span class="tag-nw">无水印</span>' : '')+
+        (live ? '<span class="tag-live">▶ '+opt.liveLabel+'</span>' : '')+
+        '<div class="dls">'+
+          (it.url ? '<a href="'+dl(it.url, d.filename+'_'+padIdx(it.index)+'.jpg')+'">图</a>' : '')+
+          (live ? '<a class="live" href="'+dl(live.url, d.filename+'_'+padIdx(it.index)+'_'+opt.liveLabel+'.mp4')+'">动态</a>' : '')+
+        '</div></figure>';
+    }).join('') + '</div>' +
+    '<div class="row" style="margin-top:14px">'+
+      '<button class="btn-dl" id="btnZip" style="border:none">⬇ 打包下载全部（'+zipLabel+'）</button>'+
+      '<button class="btn-dl gray" id="btnAll" style="border:none">逐张下载</button>'+
+    '</div>';
+
+  const zipBtn = $('btnZip');
+  if(zipBtn) zipBtn.onclick = () => zipAll(d, zipBtn, zipEntries, zipLabel);
+  const allBtn = $('btnAll');
+  if(allBtn) allBtn.onclick = () => {
+    let seq = 0;
+    items.forEach(it => {
+      if(it.url){
+        const u = it.url, n = d.filename+'_'+padIdx(it.index)+'.jpg';
+        setTimeout(() => {
+          const a = document.createElement('a');
+          a.href = dl(u, n); a.download = '';
+          document.body.appendChild(a); a.click(); a.remove();
+        }, (seq++)*350);
+      }
+      if(it.live && it.live.url){
+        const u = it.live.url, n = d.filename+'_'+padIdx(it.index)+'_'+opt.liveLabel+'.mp4';
+        setTimeout(() => {
+          const a = document.createElement('a');
+          a.href = dl(u, n); a.download = '';
+          document.body.appendChild(a); a.click(); a.remove();
+        }, (seq++)*350);
+      }
+    });
+  };
+  return true;
+}
+
 function renderMedia(d, opt){
   opt = Object.assign({}, MEDIA_DEFAULTS, opt || {});
   current = d;
@@ -1110,69 +1179,8 @@ function renderMedia(d, opt){
     };
   }
 
-  // 图集 / 实况照片
-  const box = $('imgsBox');
-  if(d.images && d.images.length){
-    const items = (Array.isArray(d.image_items) && d.image_items.length)
-      ? d.image_items
-      : d.images.map((u,i) => ({index:i+1, url:u}));
-    const liveCount = items.filter(it => it.live && it.live.url).length;
-
-    let figMeta = '共 ' + items.length + ' 张 · 无水印原图（最高清变体）';
-    if(liveCount) figMeta += ' · <span class="hi">含 ' + liveCount + ' 段' + opt.liveLabel + '动态视频</span>';
-    if(opt.liveMissingHint !== false && d.live_maybe_missing) figMeta += '（本次未能走高清通道，' + opt.liveLabel + '动态可能缺失，请稍后重试）';
-
-    // 打包条目：图片与实况动态视频混排，文件名在 ZIP 内用 ASCII 以免解压乱码
-    const zipEntries = [];
-    items.forEach(it => {
-      if(it.url) zipEntries.push({url: it.url, name: d.filename+'_'+padIdx(it.index)+'.jpg'});
-      if(it.live && it.live.url) zipEntries.push({url: it.live.url, name: d.filename+'_'+padIdx(it.index)+'_live.mp4'});
-    });
-    const zipLabel = items.length + ' 张' + (liveCount ? ' + ' + liveCount + ' 段' + opt.liveLabel : '');
-
-    box.innerHTML =
-      '<div class="fig-meta">' + figMeta + '</div>' +
-      '<div class="imgs">' + items.map(it => {
-        const live = (it.live && it.live.url) ? it.live : null;
-        const thumb = it.url || d.cover || '';
-        return '<figure><img src="'+proxy(thumb)+'" loading="lazy" alt="图'+it.index+'">'+
-          (it.url ? '<span class="tag-nw">无水印</span>' : '')+
-          (live ? '<span class="tag-live">▶ '+opt.liveLabel+'</span>' : '')+
-          '<div class="dls">'+
-            (it.url ? '<a href="'+dl(it.url, d.filename+'_'+padIdx(it.index)+'.jpg')+'">图</a>' : '')+
-            (live ? '<a class="live" href="'+dl(live.url, d.filename+'_'+padIdx(it.index)+'_'+opt.liveLabel+'.mp4')+'">动态</a>' : '')+
-          '</div></figure>';
-      }).join('') + '</div>' +
-      '<div class="row" style="margin-top:14px">'+
-        '<button class="btn-dl" id="btnZip" style="border:none">⬇ 打包下载全部（'+zipLabel+'）</button>'+
-        '<button class="btn-dl gray" id="btnAll" style="border:none">逐张下载</button>'+
-      '</div>';
-
-    $('btnZip').onclick = () => zipAll(d, $('btnZip'), zipEntries, zipLabel);
-    $('btnAll').onclick = () => {
-      let seq = 0;
-      items.forEach(it => {
-        if(it.url){
-          const u = it.url, n = d.filename+'_'+padIdx(it.index)+'.jpg';
-          setTimeout(() => {
-            const a = document.createElement('a');
-            a.href = dl(u, n); a.download = '';
-            document.body.appendChild(a); a.click(); a.remove();
-          }, (seq++)*350);
-        }
-        if(it.live && it.live.url){
-          const u = it.live.url, n = d.filename+'_'+padIdx(it.index)+'_'+opt.liveLabel+'.mp4';
-          setTimeout(() => {
-            const a = document.createElement('a');
-            a.href = dl(u, n); a.download = '';
-            document.body.appendChild(a); a.click(); a.remove();
-          }, (seq++)*350);
-        }
-      });
-    };
-  }else{
-    box.innerHTML = '';
-  }
+  // 图集 / 实况照片（渲染细节见 renderImageBox）
+  renderImageBox(d, opt);
 
   result.style.display = 'block';
 }
@@ -1562,6 +1570,26 @@ function renderTtActions(d){
   }
 }
 
+/* 「代理」一行：视频与图文两种形态都要显示，抽出来共用。
+   把「当前用哪个代理」明示出来，排查时能省一步。
+   注意「未配置代理」既可能是大陆环境下的配置缺失，也可能是境外部署的正常直连状态 ——
+   具体是哪种看后端返回的 outlet / reachable，别在前端下结论。 */
+function ttProxyRow(d){
+  if(!d.proxy) return '';
+  const auto = String(d.proxy.source || '').startsWith('auto');
+  const txt = d.proxy.configured
+    ? '代理 ' + d.proxy.value + (auto ? '（自动探测）' : '')
+    : '未配置代理';
+  return '<div class="quality"><label>代理</label>' +
+    '<span class="'+(d.proxy.configured ? 'tag-hd' : 'tag-warn')+'">'+escapeHtml(txt)+'</span>' +
+    '<button class="btn-mini" id="btnTtProxyCfg" style="border:none">设置代理 →</button></div>';
+}
+
+function bindTtProxy(){
+  const btn = $('btnTtProxyCfg');
+  if(btn){ btn.onclick = () => openSettings('tiktok'); }
+}
+
 function renderTtQuality(d){
   const qbox = $('qualityBox');
   let html = '';
@@ -1592,18 +1620,8 @@ function renderTtQuality(d){
     }
   }
 
-  // 代理状态：把「当前用哪个代理」明示出来，排查时能省一步。
-  // 注意「未配置代理」既可能是大陆环境下的配置缺失，也可能是境外部署的正常直连状态 ——
-  // 具体是哪种看后端返回的 outlet / reachable，别在前端下结论。
-  if(d.proxy){
-    const auto = String(d.proxy.source || '').startsWith('auto');
-    const txt = d.proxy.configured
-      ? '代理 ' + d.proxy.value + (auto ? '（自动探测）' : '')
-      : '未配置代理';
-    html += '<div class="quality"><label>代理</label>' +
-      '<span class="'+(d.proxy.configured ? 'tag-hd' : 'tag-warn')+'">'+escapeHtml(txt)+'</span>' +
-      '<button class="btn-mini" id="btnTtProxyCfg" style="border:none">设置代理 →</button></div>';
-  }
+  // 代理状态（见 ttProxyRow 的说明）
+  html += ttProxyRow(d);
 
   if(d.hint){
     html += '<div class="notice">' + escapeHtml(d.hint) + '</div>';
@@ -1619,12 +1637,74 @@ function renderTtQuality(d){
       renderTtActions(d);
     };
   }
-  const cfgBtn = $('btnTtProxyCfg');
-  if(cfgBtn){ cfgBtn.onclick = () => openSettings('tiktok'); }
+  bindTtProxy();
+}
+
+/* TikTok 图文帖（Photo Mode）渲染。
+   与视频形态的关键差别：没有视频预览、也没有画质选择器 —— 主体是图集 + 打包下载，
+   所以不复用 renderTtActions / renderTtQuality 里那些围绕「档位」的分支。 */
+function renderTtImages(d){
+  tt = null;
+  current = null;
+  bili = null;
+
+  const media = $('media');
+  media.innerHTML = d.cover
+    ? '<div class="cover-wrap"><img src="'+proxy(d.cover)+'" alt="封面">'+
+      '<span class="badge-live">图文 · '+d.images.length+' 张</span></div>'
+    : '';
+
+  $('title').innerHTML = escapeHtml(d.title || ('TikTok ' + (d.id || ''))) +
+    '<span class="badge plat tt">TikTok</span>';
+  $('title').title = d.title || '';
+
+  const handle = (d.author && (d.author.unique_id || d.author.name)) || 'TikTok';
+  const nick = (d.author && d.author.name) || '';
+  $('author').innerHTML = '<span>@'+escapeHtml(handle)+'</span>' +
+    (nick && nick !== handle ? '<span class="sub-author">'+escapeHtml(nick)+'</span>' : '');
+
+  const meta = ['图片 <b>'+d.images.length+' 张</b>'];
+  if(d.stats && d.stats.play) meta.push('播放 <b>'+fmt(d.stats.play)+'</b>');
+  if(d.stats && d.stats.digg) meta.push('点赞 <b>'+fmt(d.stats.digg)+'</b>');
+  if(d.stats && d.stats.comment) meta.push('评论 <b>'+fmt(d.stats.comment)+'</b>');
+  if(d.region) meta.push('区域 <b>'+escapeHtml(d.region)+'</b>');
+  $('meta').innerHTML = meta.join('　');
+
+  // 没有档位可选，这里只留代理行与说明
+  $('qualityBox').innerHTML = ttProxyRow(d) +
+    (d.hint ? '<div class="notice">' + escapeHtml(d.hint) + '</div>' : '');
+  bindTtProxy();
+
+  const acts = [];
+  if(d.cover){
+    acts.push('<a class="btn-dl sec" href="'+dl(d.cover, d.filename+'_封面.jpg')+'">下载封面</a>');
+  }
+  if(d.music && d.music.url){
+    acts.push('<a class="btn-dl gray" href="'+dl(d.music.url, d.filename+'_原声.mp3')+'">下载原声</a>');
+  }
+  acts.push('<button class="btn-dl gray" id="btnTtCopy" style="border:none">复制直链</button>');
+  $('actions').innerHTML = acts.join('');
+
+  const copyBtn = $('btnTtCopy');
+  if(copyBtn){
+    copyBtn.onclick = () => {
+      copyText((d.images && d.images[0]) || d.cover || '', copyBtn);
+    };
+  }
+
+  renderImageBox(d, { liveLabel: '实况', liveMissingHint: false });
+
+  result.style.display = 'block';
 }
 
 function renderTiktok(d){
   dlPlatform = 'tiktok';
+
+  // 图文帖分流：没有 qualities，下面所有围绕档位的分支都不适用
+  if(d.type === 'images' && d.images && d.images.length){
+    return renderTtImages(d);
+  }
+
   tt = {
     qualities: d.qualities || [],
     qnIdx: d.best_index || 0,

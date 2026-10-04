@@ -65,6 +65,7 @@ import re
 import socket
 import threading
 import time
+import unicodedata
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
@@ -628,6 +629,87 @@ def _from_bitrate_info(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
+def _from_play_addr(video: Dict[str, Any], api_item: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """兜底档位：从网页内嵌的 playAddr 系列字段构出一个可用档位。
+
+    ★ 为什么必须有它（2026-10-04 实测，作品 7692755574152301831）：
+    TikTok 网页 SSR 里的 `video.bitrateInfo` 与 items 接口的 `video_info.profiles`
+    会**同时为空** —— 于是主路径构建不出任何档位，直接掉到 yt-dlp 兜底。
+    而 exe / APK / 云端容器里通常**没有 yt-dlp**，表现就是「这条链接解析不了」。
+    但网页数据里一直存在可用直链（`video.playAddr` 实测 206 + `video/mp4`），
+    只是原先没有被使用 —— 这就是那个 bug 的根因。
+
+    取源优先级（越靠前越完整）：
+      1. `video.PlayAddrStruct.UrlList` —— 附带 DataSize / Width / Height
+      2. `video.playAddr`（字符串，实测最稳）
+      3. items 接口的 `video_info.url_list`
+      4. `video.downloadAddr`（作为备胎链一并登记，playAddr 被拒时可换）
+    多条直链会经 `_rank_urls` 登记为「互为备胎」，取流层 403 时自动换链。
+    """
+    urls: List[str] = []
+    size = 0
+    width = int(video.get("width") or 0)
+    height = int(video.get("height") or 0)
+
+    struct = video.get("PlayAddrStruct") or {}
+    if isinstance(struct, dict):
+        urls += [u for u in (struct.get("UrlList") or []) if u]
+        try:
+            size = int(struct.get("DataSize") or 0)
+        except (TypeError, ValueError):
+            size = 0
+        width = int(struct.get("Width") or 0) or width
+        height = int(struct.get("Height") or 0) or height
+
+    for key in ("playAddr", "downloadAddr"):
+        value = video.get(key)
+        if isinstance(value, str) and value:
+            urls.append(value)
+
+    api_urls = (api_item.get("video_info") or {}).get("url_list") or []
+    urls += [u for u in api_urls if isinstance(u, str) and u]
+
+    if not size:
+        try:
+            size = int(video.get("size") or 0)
+        except (TypeError, ValueError):
+            size = 0
+
+    ranked = _rank_urls(_ordered_unique(urls))
+    if not ranked:
+        return []
+
+    codec = str(video.get("codecType") or "")
+    return [
+        {
+            "gear": str(video.get("encodedType") or "play_addr"),
+            "label": _quality_label(height, width, 0, codec),
+            "width": width,
+            "height": height,
+            "fps": 0,  # 兜底路径拿不到帧率，别编一个出来
+            "codec": codec,
+            "hdr": "",
+            "bitrate": 0,
+            "size": size,
+            "url": ranked[0],
+            "urls": ranked,
+            "ext": "mp4",
+            "has_audio": True,
+        }
+    ]
+
+
+def _ordered_unique(values: List[str]) -> List[str]:
+    """去重且**保持原顺序**（set 会打乱，而 TikTok 给的顺序本身有意义）。"""
+    seen = set()
+    out: List[str] = []
+    for value in values:
+        if value and value not in seen:
+            seen.add(value)
+            out.append(value)
+    return out
+
+
 def _sort_key(item: Dict[str, Any]) -> Tuple[int, int, int]:
     """排序口径：分辨率 → 帧率 → 码率，全部降序。"""
     return (item.get("height") or 0, item.get("fps") or 0, item.get("bitrate") or 0)
@@ -709,9 +791,34 @@ def _stats_of(item: Dict[str, Any], api_item: Dict[str, Any]) -> Dict[str, int]:
 
 
 def _safe_name(value: str, fallback: str = "tiktok") -> str:
+    """把标题 / 作者名压成安全文件名。
+
+    除常规的非法字符替换外，额外清掉 **`C*` 类字符**（控制 / 格式 / 代理 / 私用 / 未分配）：
+    实测有的账号昵称就是一串 `U+FFF4`（未分配码位），原样保留会得到「看起来是空
+    字符串的文件名」，用户在文件管理器里根本认不出这是哪个文件。
+    只清 `C*`，不动 `Z*`（空格）—— 否则「Puncak ketenangan」会被拼成
+    「Puncakketenangan」。
+    """
     cleaned = re.sub(r'[\\/:*?"<>|\r\n\t#]', "_", (value or "").strip())
+    cleaned = "".join(ch for ch in cleaned if not unicodedata.category(ch).startswith("C"))
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" .")
     return cleaned[:70] or fallback
+
+
+def _filename_of(author: Dict[str, str], description: str, video_id: str) -> str:
+    """构造下载文件名：`作者-标题前 30 字`，两边都拿不出可见字符时退回作品 id。
+
+    先各自 `_safe_name`、**丢掉空片段**再拼接，而不是拼完再洗 —— 否则「昵称全是
+    不可见字符」会留下一个孤零零的前导连字符（如 `-Puncak ketenangan`）。
+    """
+    who = _safe_name(str(author.get("name") or ""), fallback="")
+    if not who:
+        who = _safe_name(str(author.get("unique_id") or ""), fallback="")
+    parts = [p for p in (who, _safe_name(description[:30], fallback="")) if p]
+    name = _safe_name("-".join(parts), fallback="")
+    if not name or name == "tiktok":
+        return f"tiktok_{video_id}"
+    return name
 
 
 # ---------------------------------------------------------------------------
@@ -812,6 +919,107 @@ def _ytdlp_formats(url: str, proxy: str) -> Tuple[List[Dict[str, Any]], Dict[str
 
 
 # ---------------------------------------------------------------------------
+# 图文帖（Photo Mode）
+#
+# 结构（2026-10-04 实测作品 7692768623206616334，7 张图）：
+#   item.imagePost.images[i] = {"imageURL": {"urlList": [...]},
+#                               "imageWidth": 2158, "imageHeight": 3838}
+#   item.imagePost.cover     = {"imageURL": {"urlList": [...]}}
+# 注意：这类作品的 item.video 是**空壳**（duration=0、无 playAddr），
+# 所以不能指望视频路径，必须单独成支。
+#
+# 输出契约与抖音 / 小红书对齐（type="images" + images + image_items），
+# 这样前端渲染与 ZIP 打包逻辑都能原样复用，不必为 TikTok 另写一套。
+# ---------------------------------------------------------------------------
+
+
+def _image_items_of(item: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """把图文帖的 images 归一化成 image_items；非图文帖返回空表。"""
+    images = ((item.get("imagePost") or {}).get("images")) or []
+    out: List[Dict[str, Any]] = []
+    for index, entry in enumerate(images, start=1):
+        if not isinstance(entry, dict):
+            continue
+        urls = _rank_urls(
+            [u for u in ((entry.get("imageURL") or {}).get("urlList") or []) if u]
+        )
+        if not urls:
+            continue
+        out.append(
+            {
+                "index": index,
+                "url": urls[0],
+                "urls": urls,
+                "width": int(entry.get("imageWidth") or 0),
+                "height": int(entry.get("imageHeight") or 0),
+                "ext": "jpg",
+            }
+        )
+    return out
+
+
+def _image_cover_of(item: Dict[str, Any]) -> str:
+    """图文帖的封面：优先 imagePost.cover（就是第一张图），退回 video.cover。"""
+    cover = ((item.get("imagePost") or {}).get("cover")) or {}
+    urls = ((cover.get("imageURL") or {}).get("urlList")) or []
+    for url in urls:
+        if url:
+            return url
+    return _cover_of(item.get("video") or {}, {})
+
+
+def _image_result(
+    item: Dict[str, Any],
+    api_item: Dict[str, Any],
+    image_items: List[Dict[str, Any]],
+    video_id: str,
+    final_url: str,
+    proxy: str,
+    proxy_source: str,
+) -> Dict[str, Any]:
+    """组装图文帖的返回结构（字段口径与视频结果保持一致，便于前端共用渲染）。"""
+    description = str(item.get("desc") or api_item.get("desc") or "").strip()
+    author = _author_of(item, api_item)
+    music = api_item.get("music_info") or {}
+    web_music = item.get("music") or {}
+
+    filename = _filename_of(author, description, video_id)
+
+    return {
+        "platform": "tiktok",
+        "type": "images",
+        "id": video_id,
+        "url": final_url,
+        "title": description or f"TikTok {video_id}",
+        "desc": description,
+        "author": author,
+        "duration": 0,
+        "create_time": item.get("createTime") or 0,
+        "region": item.get("region") or api_item.get("region") or "",
+        "cover": _image_cover_of(item),
+        "music": {
+            "title": str(music.get("title") or web_music.get("title") or ""),
+            "url": str(web_music.get("playUrl") or ""),
+        },
+        "stats": _stats_of(item, api_item),
+        # 图文帖没有视频档位；保留空表让前端的「是否视频」判断自然落到 false
+        "qualities": [],
+        "best_index": 0,
+        "filename": filename,
+        "hint": f"这是一条图文帖（Photo Mode），共 {len(image_items)} 张无水印原图，"
+                "可单张下载或一键打包为 ZIP",
+        "source": "web",
+        "proxy": {
+            "value": proxy,
+            "source": proxy_source,
+            "configured": bool(proxy),
+        },
+        "images": [entry["url"] for entry in image_items],
+        "image_items": image_items,
+    }
+
+
+# ---------------------------------------------------------------------------
 # 主入口
 # ---------------------------------------------------------------------------
 
@@ -843,12 +1051,11 @@ def parse(text: str) -> Dict[str, Any]:
     video = item.get("video") or {}
     api_video = api_item.get("video_info") or {}
 
-    # 图文帖（Photo Mode）走的是另一套结构，本工具暂不处理 —— 明确告知而非静默出错
-    images = ((item.get("imagePost") or {}).get("images")) or []
-    if images:
-        raise TikTokError(
-            f"这是一条图文帖（Photo Mode，{len(images)} 张图），本工具目前只处理视频帖。"
-            "如需支持图文，告诉我一声即可加上。"
+    # 图文帖（Photo Mode）走的是另一套结构（video 是空壳，见上方注释），必须在此分流
+    image_items = _image_items_of(item)
+    if image_items:
+        return _image_result(
+            item, api_item, image_items, video_id, final_url, proxy, proxy_source
         )
 
     qualities = _dedupe(
@@ -857,7 +1064,15 @@ def parse(text: str) -> Dict[str, Any]:
     source = "web"
     yt_meta: Dict[str, Any] = {}
 
-    # 主路径拿不到档位时，退回 yt-dlp（代价：丢 fps，只按 分辨率→码率 排）
+    # 兜底一：网页内嵌的 playAddr（零额外依赖）。
+    # 实测 TikTok 的 bitrateInfo 与 profiles 会同时为空，这一步才是常态出口。
+    if not qualities:
+        qualities = _dedupe(_from_play_addr(video, api_item))
+        if qualities:
+            source = "web-playaddr"
+
+    # 兜底二：yt-dlp（代价：丢 fps，排序退化为 分辨率→码率；
+    # 且 exe / APK / 云端容器里通常没有它，所以不能把它当成主出口）
     if not qualities:
         qualities, yt_meta = _ytdlp_formats(final_url, proxy)
         qualities = _dedupe(qualities)
@@ -884,14 +1099,14 @@ def parse(text: str) -> Dict[str, Any]:
         if len(qualities) > 1
         else f"TikTok 网页端对该视频只提供 1 个档位：{best['label']}（这就是它能给到的最高画质）"
     )
+    if source == "web-playaddr":
+        hint += " · 本次由网页内嵌直链解析（该作品未返回多档位，帧率不可得）"
     if source == "ytdlp":
         hint += " · 本次由 yt-dlp 兜底解析（该路径取不到帧率，排序退化为分辨率→码率）"
     if proxy_source.startswith("auto:"):
         hint += f" · 代理自动探测为 {proxy}"
 
-    filename = _safe_name(f"{author.get('name') or author.get('unique_id') or 'tiktok'}-{description[:30]}")
-    if not filename or filename == "tiktok":
-        filename = f"tiktok_{video_id}"
+    filename = _filename_of(author, description, video_id)
 
     duration = _duration_of(video, api_item) or int(yt_meta.get("duration") or 0)
     cover = _cover_of(video, api_item) or str(yt_meta.get("cover") or "")
