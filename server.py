@@ -27,6 +27,7 @@ import webbrowser
 import zipfile
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
+from itertools import chain
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
@@ -48,6 +49,7 @@ from starlette.background import BackgroundTask
 import bili_parser
 import dash_muxer
 import disk_saver
+import douyin_parser
 import runtime_paths
 import tiktok_parser
 import xhs_parser
@@ -426,6 +428,19 @@ XHS_HOST_SUFFIXES = (
     "xhs.cn",
 )
 
+# 抖音用于「域名推断」的后缀。前端一直会带 platform=douyin，这里只是兜底：
+# 少了它，`_platform_of` 对抖音直链会返回空串，`_candidates` 也就不会给
+# play 直链派生多主机备源（见 douyin_parser.play_variants）。
+# 与其它三家无交集，放在推断链最后，不改动既有平台的判定结果。
+DOUYIN_HOST_SUFFIXES = (
+    "douyin.com",
+    "iesdouyin.com",
+    "snssdk.com",
+    "amemv.com",
+    "douyinvod.com",
+    "douyinpic.com",
+)
+
 
 def _platform_of(url: str, platform: str = "") -> str:
     """归一化「这条直链属于哪个平台」：调用方显式给了就用它，否则按域名推断。
@@ -440,6 +455,9 @@ def _platform_of(url: str, platform: str = "") -> str:
 
     解析那一刻明明知道是哪个平台，这个信息就该一路带到取流这一层，
     而不是到了下载再靠域名猜一次。
+
+    这张推断表只是**兜底**，不替代调用方把 platform 带下来：抖音的后缀
+    （2026-10-10 补）只为了让 play 直链在「没带 platform」时也能拿到多主机备源。
     """
     kind = (platform or "").strip().lower()
     if kind in ("douyin", "bilibili", "tiktok", "xiaohongshu"):
@@ -452,6 +470,7 @@ def _platform_of(url: str, platform: str = "") -> str:
         ("tiktok", TIKTOK_HOST_SUFFIXES),
         ("bilibili", BILI_HOST_SUFFIXES),
         ("xiaohongshu", XHS_HOST_SUFFIXES),
+        ("douyin", DOUYIN_HOST_SUFFIXES),
     ):
         if any(host == s or host.endswith("." + s) for s in suffixes):
             return name
@@ -522,10 +541,17 @@ def _describe(url: str, platform: str = "") -> str:
     return "%s · %s" % (host, _outlet(url, platform))
 
 
-#: TikTok 经代理取流的尝试次数。链路比直连长（本机代理 → 境外节点 → CDN），
-#: 偶发 5xx 很常见，重一次就能过的比例不低。其余平台保持单次 ——
-#: 它们直连，失败基本是确定性的（403 防盗链 / 404 直链过期），重试只会拖慢报错。
-TIKTOK_ATTEMPTS = 2
+#: 「同一条直链」的尝试次数，按平台给。
+#:
+#: - TikTok 走代理：链路长（本机代理 → 境外节点 → CDN），偶发 5xx 很常见。
+#: - 抖音直连：实测（2026-10-10 用户截图）失败形态是**连接层错误**
+#:   `HTTPSConnectionPool(host='v5-ali-northeast.douyinvod.com'): Max retries
+#:   exceeded with url: /…/video/tos/cn/…` —— 即 `play` 接口 302 到的那个
+#:   CDN 节点连不上。这是**瞬态**的（换一次 IP/节点就通），重试一次很值得。
+#: - 其余平台保持单次：它们直连，失败基本是确定性的（403 防盗链 / 404 直链过期），
+#:   重试只会拖慢报错。
+RETRY_ATTEMPTS = {"tiktok": 2, "douyin": 2}
+DEFAULT_ATTEMPTS = 1
 RETRY_PAUSE = 0.6
 
 #: 「这条直链对本条请求是死的」的状态码 —— 重试同一条毫无意义，**换一条**才有意义。
@@ -543,11 +569,19 @@ def _candidates(url: str, platform: str = "") -> List[str]:
     `webapp-prime` 那两条**恒定 403**（与请求头无关），而同组的
     `www.tiktok.com` 会 302 到可用的 `*.tiktokcdn-us.com`。
     所以「换一条」是这类 403 的正解，重试同一条不是。
+
+    抖音（2026-10-10 补）：高清通道被 Argus 风控挡死后只剩降级链路，
+    而降级链路的 `play_addr.url_list` **实测只有一条**直链 —— 一条不通就整条失败。
+    这里按「同 video_id 换主机」派生备源（同一份文件，见 douyin_parser.PLAY_HOSTS）。
     """
-    if _platform_of(url, platform) != "tiktok":
-        return [url]
-    rest = [u for u in tiktok_parser.alternatives(url) if u and u != url]
-    return [url] + rest[:TIKTOK_ALT_LIMIT]
+    kind = _platform_of(url, platform)
+    if kind == "tiktok":
+        rest = [u for u in tiktok_parser.alternatives(url) if u and u != url]
+        return [url] + rest[:TIKTOK_ALT_LIMIT]
+    if kind == "douyin":
+        return [url] + [u for u in douyin_parser.play_variants(url) if u and u != url]
+    return [url]
+
 
 
 def _open_url(
@@ -567,8 +601,8 @@ def _open_url(
     在真机上很关键：用户截图就能看出到底是主机被拒（403）还是出口不通
     （ProxyError / ConnectTimeout），而不是只看到一句 HTTP 状态码。
     """
-    is_tiktok = _platform_of(url, platform) == "tiktok"
-    attempts = TIKTOK_ATTEMPTS if is_tiktok else 1
+    kind = _platform_of(url, platform)
+    attempts = RETRY_ATTEMPTS.get(kind, DEFAULT_ATTEMPTS)
     candidates = _candidates(url, platform)
 
     last_exc: Optional[Exception] = None
@@ -807,6 +841,32 @@ def _upstream_detail(url: str, platform: str, status: int,
     return text
 
 
+#: 明确「不是媒体」的响应类型。风控页 / 网关错误页最爱用这几种，
+#: 而它们的 HTTP 状态码仍可能是 200 —— 只看状态码会被骗过去。
+NON_MEDIA_TYPES = (
+    "text/html", "text/plain", "text/xml", "text/javascript",
+    "application/json", "application/xml",
+)
+
+
+def _upstream_payload_problem(content_type: str, first: bytes) -> str:
+    """上游返回 2xx，但正文明显不是媒体时给出中文原因；正常则返回空串。
+
+    判据只有两条，力求**不误伤**正常媒体：
+      1. Content-Type 落在 `NON_MEDIA_TYPES` 里；
+      2. 正文为空，或正文首字节是 `<` / `{`（网页、JSON）。
+    真实的 mp4/jpg/mp3 首字节分别是 `ftyp`/`FF D8`/`ID3`，两条都不命中。
+    """
+    if not first:
+        return "上游返回了空内容 —— 直链可能已失效，请重新解析一次再下载"
+    ctype = (content_type or "").split(";")[0].strip().lower()
+    if ctype in NON_MEDIA_TYPES:
+        return "上游返回的不是媒体文件（Content-Type: %s）" % ctype
+    if first[:1] in (b"<", b"{"):
+        return "上游返回的是网页/JSON 而不是媒体文件"
+    return ""
+
+
 @app.get("/api/download")
 def api_download(
     url: str = Query(..., description="媒体直链"),
@@ -835,6 +895,34 @@ def api_download(
     content_type = upstream.headers.get("Content-Type", "application/octet-stream")
     length = upstream.headers.get("Content-Length")
 
+    # 先取第一个分片再决定要不要透传。
+    #
+    # ★ 为什么必须看内容（2026-10-10 实测）：上游 2xx **不等于**拿到了媒体。
+    #   - `aweme/v1/play/` 参数不全时 → HTTP 200 + **空 body**
+    #   - 签名过期的封面 → HTTP 200 + **text/html**（openresty 错误页）
+    #   原样透传的后果是浏览器「下载成功」地存下一个 0 字节或一坨 HTML 的 `.mp4`，
+    #   用户看到的现象就是「下载不成功」，而且没有任何可排查的原因。
+    # 只开**一个**迭代器：peek 走首个分片后，后续从同一个生成器继续读。
+    # 不能 `next(r.iter_content())` + 再 `r.iter_content()` —— requests 的
+    # iter_content 是可续读的，但「调用两次」这种写法依赖实现细节，容易在换
+    # 底层库时变成重复下载第一片。
+    stream = upstream.iter_content(chunk_size=65536)
+    try:
+        first = next(stream, b"")
+    except requests.RequestException as exc:
+        upstream.close()
+        raise HTTPException(
+            status_code=502,
+            detail="读取资源失败（%s）：%s" % (_describe(url, platform), exc),
+        )
+
+    reason = _upstream_payload_problem(content_type, first)
+    if reason:
+        upstream.close()
+        raise HTTPException(
+            status_code=502, detail="%s（%s）" % (reason, _describe(url, platform))
+        )
+
     headers = {
         "Content-Disposition": _content_disposition(name),
         "Cache-Control": "no-cache",
@@ -843,7 +931,7 @@ def api_download(
         headers["Content-Length"] = length
 
     return StreamingResponse(
-        upstream.iter_content(chunk_size=65536),
+        chain([first], stream),
         media_type=content_type,
         headers=headers,
     )

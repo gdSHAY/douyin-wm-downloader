@@ -12,7 +12,9 @@
     2. 输出结构化元数据（作者、封面、音乐、互动数据、多 CDN 备源）；
     3. 多策略 URL 提取，兼容短链、长链、discover、分享口令文本；
     4. 无水印地址做 playwm->play 归一化，并保留全部备源用于失败重试；
-    5. 图集取「无水印且分辨率最高」变体，实况照片额外输出动态视频（无水印）。
+    5. 图集取「无水印且分辨率最高」变体，实况照片额外输出动态视频（无水印）；
+    6. 降级链路的 play 直链常有「只有一条」的问题，按同 video_id 派生多主机备源
+       （`play_variants`），交给服务端取流层换链 —— 见下方 PLAY_HOSTS 注释。
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qs, urlparse
 
 import requests
 
@@ -60,6 +63,63 @@ VIDEO_PAGE_KEY = "video_(id)/page"
 NOTE_PAGE_KEY = "note_(id)/page"
 
 ILLEGAL_FILENAME = re.compile(r'[\\/:*?"<>|\r\n\t]')
+
+# ---------------------------------------------------------------------------
+# 播放直链的多主机备源
+#
+# ★ 为什么需要（2026-10-10 实测，用户报「这条抖音链接下载不成功」时查出来的）：
+#
+# 高清通道被抖音的 Argus 风控挡死后（响应体 `Blocked by ArgusSecurityPlugin
+# Uifid Not Found`），所有抖音作品都走分享页降级链路；而降级链路给出的
+# `play_addr.url_list` **实测只有一条**直链，`download_addr` / `bit_rate` 都是空。
+# 一条直链 + 零备胎 = 单点失败：那条链所在的 CDN 节点抖动、或被出口挡住，
+# 用户看到的就是「解析成功，但下载失败」，而且没有任何可换的候选。
+#
+# 实测同一个 `video_id` 在三台主机上取到的文件**字节完全相同**
+#（2026-10-10：14668063 B / ratio=720p），所以把这三台互设备源是零风险的：
+# 换链不会换内容、不会换画质，只是绕开那台出问题的主机。
+#
+# ⚠️ 备源只换主机，**绝不碰 `ratio`**。实测 `ratio` 的语义会随作品横竖屏反转：
+#   横屏 1920×1080 → ratio=1080p 得 1920×1080（22.1 MB，比 720p 更大）
+#   竖屏 1080×1920 → ratio=1080p 得  576×1024（ 1.7 MB，比 720p 更小！）
+# 也就是说「调高 ratio」对竖屏作品会把画质改**坏**。取流失败时换主机才是安全动作。
+# ---------------------------------------------------------------------------
+PLAY_HOSTS = ("aweme.snssdk.com", "www.iesdouyin.com", "www.douyin.com")
+
+PLAY_PATH = "/aweme/v1/play/"
+
+
+def play_variants(url: str) -> List[str]:
+    """从一条抖音 play 直链派生出**同档位**的其它主机直链（不含原链）。
+
+    只做「同一个 video_id 换主机」这一种派生，`ratio` / `line` 原样保留。
+    副作用之一是顺带去掉了分享页带的 `logo_name=aweme_diversion_search`
+    （实测带不带该参数返回的字节数完全一致，去掉只是让 URL 更干净）。
+
+    非 play 直链（图集 jpg、实况 mp4、封面等）返回空表 —— 不猜、不拼。
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return []
+    if PLAY_PATH not in (parsed.path or ""):
+        return []
+
+    query = parse_qs(parsed.query or "")
+    video_id = (query.get("video_id") or [""])[0]
+    if not video_id:
+        return []
+    ratio = (query.get("ratio") or ["720p"])[0] or "720p"
+    line = (query.get("line") or ["0"])[0] or "0"
+
+    variants: List[str] = []
+    for host in PLAY_HOSTS:
+        candidate = "https://%s%s?video_id=%s&ratio=%s&line=%s" % (
+            host, PLAY_PATH, video_id, ratio, line)
+        if candidate != url and candidate not in variants:
+            variants.append(candidate)
+    return variants
+
 
 
 class ParseError(Exception):
