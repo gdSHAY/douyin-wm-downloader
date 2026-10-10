@@ -38,7 +38,7 @@ The UI is a web page, but the **server runs on your own machine** (`127.0.0.1`).
 <div align="center">
 <img src="./docs/screenshot-result-zh.png" width="880" alt="Parse result">
 <br>
-<sub>Paste a Douyin link → platform auto-detected, best available quality selected (720P H.265), download buttons ready</sub>
+<sub>Paste a Douyin link → platform auto-detected, quality tiers listed with the highest preselected, download buttons ready</sub>
 </div>
 
 <br>
@@ -84,7 +84,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.9-win64.zip` (≈ 77 MB, ≈ 166 MB unpacked) |
+| File | `multipldl-1.0.10-win64.zip` (≈ 73 MB, ≈ 166 MB unpacked) |
 | Dependencies | **None** — Python 3.13 and ffmpeg are bundled |
 
 1. **Extract the whole folder** (⚠️ do *not* drag the `.exe` out on its own — `_internal/` is part of it)
@@ -97,7 +97,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.9-arm64-v8a-debug.apk` (23.8 MB) |
+| File | `multipldl-1.0.10-arm64-v8a-debug.apk` (23.8 MB) |
 | ABI | `arm64-v8a` (virtually every phone since 2017) |
 | Signing | **debug-signed** — you must allow installs from unknown sources; no release signing yet |
 
@@ -120,7 +120,7 @@ If port 8787 is taken the server moves on to 8788 and so on — trust the addres
 
 | Platform | Video | Photo set | Max quality | Also |
 | --- | --- | --- | --- | --- |
-| **Douyin** | ✅ watermark-free mp4 | ✅ originals | share-page tier (**720P** measured); up to 1440P when the HD channel is open — **that channel is currently blocked by risk control**, see below | Live Photos (still + motion), cover, quality picker |
+| **Douyin** | ✅ watermark-free mp4 | ✅ originals | **multiple tiers, 576P ~ 1080P measured** (highest preselected; ceiling set by the upload) | Live Photos (still + motion), cover, quality picker |
 | **Bilibili** | ✅ DASH-muxed mp4 | — | 480P anonymous / up to 4K signed in | multi-part, MP3 audio, danmaku XML, cover, local-mux fallback |
 | **TikTok** | ✅ watermark-free mp4 | ✅ watermark-free photos | **up to 4K 60fps** | photo posts (Photo Mode) with one-click zip, auto-picks by resolution → fps → bitrate, cover, original audio |
 | **Xiaohongshu** | ✅ watermark-free mp4 | ✅ hi-res originals | originals / source video | Live Photos, download-all-as-ZIP |
@@ -183,21 +183,37 @@ A bare note ID is rejected by the platform (measured: "the page you are looking 
 
 ### Douyin: "why is there no higher quality?"
 
-Douyin has two fetch paths, and **only the second one works right now**:
+Douyin has two fetch paths, and **both work now** — the tool picks the better one:
 
 | Channel | How it is called | Qualities | Status |
 | --- | --- | --- | --- |
-| **HD channel** (signed) | `a_bogus`-signed call to the web detail API, reads every entry in `bit_rate` | up to **1440P / 1080P** (capped by what the author uploaded) | ❌ **blocked by risk control** |
-| Fallback channel (share page) | reads `_ROUTER_DATA` on the share page | a single tier (**720P** measured) | ✅ works |
+| **HD channel** (signed) | `a_bogus`-signed call to the web detail API, reads every entry in `bit_rate` | up to **1440P / 1080P** (ceiling set by the upload; 6 tiers measured this round, 576P ~ 1080P) | ✅ **works** (since 1.0.10) |
+| Fallback channel (share page) | reads `_ROUTER_DATA` on the share page | a single tier (**720P** measured) | ✅ works (safety net) |
 
-The HD channel needs a device-fingerprint cookie called `Uifid`, which **only the real app can inject** — browsers and servers cannot obtain it. Without it the API returns a constant `403 Blocked by ArgusSecurityPlugin Uifid Not Found` (measured 2026-10).
+**Correction shipped in 1.0.10**: documentation up to 1.0.9 claimed the HD channel was
+"blocked by risk control" and needed a device-fingerprint cookie called `Uifid`.
+**That was wrong.** The only thing missing was one request header, `x-tt-argus`:
+
+| Headers sent | Result |
+| --- | --- |
+| without `x-tt-argus` | `403 Blocked by ArgusSecurityPlugin Uifid Not Found` |
+| adding only a *fake* `uifid` | `403 ... Signature Not Found` (worse — it makes you think the signature broke) |
+| with `x-tt-argus` (any value) | **200**, full quality list returned |
+
+An **anonymous `ttwid`** is all you need — no login, no device fingerprint. The
+"Uifid Not Found" wording in that error is a red herring; don't go chasing `Uifid`.
 
 So this is the actual state today:
 
-1. Fetching goes through the share page, and **the tier is whatever that page hands out** — 720P in our measurements, with no quality picker in the UI.
-2. Even if the channel came back, **the post itself has a ceiling** — a large share of Douyin portrait videos are only 720P; only some newer posts have 1080P / 2K / 4K. The quality list comes from the platform's own response, so if the source is 720p, no tool can invent 4K.
+1. The HD channel is used by default, with a **quality dropdown that preselects the highest tier**.
+2. **The post itself still has a ceiling** — a large share of Douyin portrait videos are only 720P; only some posts have 1080P / 2K / 4K. The quality list comes from the platform's own response, so if the source is 720p, no tool can invent 4K.
+3. If the HD channel ever fails (post not visible / gateway rule change), the tool falls back to the share page's 720P — still **watermark-free** — and labels it "fallback channel". For the specific reason, open DevTools and read `hd_error` in the `/api/parse` response.
 
-The fallback channel still yields a **watermark-free** video, just with no quality choice. For the specific reason, open DevTools and read `hd_error` in the `/api/parse` response — the backend states plainly whether it was "empty response (possibly risk-controlled)" or a network timeout.
+> ⚠️ Worth knowing: this currently relies on a **fixed header** slipping past the gateway
+> check (the gateway does not validate its value *yet*). If Douyin ever turns on real
+> validation, the HD channel will stop working again and the tool will fall back
+> automatically — the fix at that point is to inject JS so Douyin's own SDK fills in
+> the header, not to keep guessing a constant.
 
 ## 🧱 Built with
 

@@ -1111,17 +1111,27 @@ function renderMedia(d, opt){
   $('meta').innerHTML = meta.join('　');
 
   // 清晰度选择器
+  //
+  // 默认选中**最高档**：档位数组由后端按「分辨率 → 码率」降序排好，故 [0] 即最高。
+  // 这里显式写出 `selected` 并在标签上标「最高画质」，而不是靠「浏览器默认选第一个」
+  // —— 后者是个隐式约定，哪天有人重排了数组顺序就会静默变成「默认选中低画质」。
+  // 抖音的档位来自高清通道（`x-tt-argus`），没有它就只有 1 档、这里不渲染下拉。
   const qbox = $('qualityBox');
+  const channelTag = d.hd
+    ? '<span class="tag-hd">高清通道</span>'
+    : '<span class="tag-fallback">降级通道 · 仅默认档</span>';
+  const optionHtml = (q,i) =>
+    '<option value="'+i+'"'+(i===0?' selected':'')+'>'+
+    escapeHtml(q.label)+(i===0?' · 最高画质':'')+'</option>';
   if(isVideo && d.qualities && d.qualities.length > 1){
+    currentIdx = 0;
     qbox.innerHTML =
       '<div class="quality">'+
       '<label>清晰度</label>'+
       '<select id="qsel">'+
-      d.qualities.map((q,i) =>
-        '<option value="'+i+'">'+escapeHtml(q.label)+'</option>').join('')+
+      d.qualities.map(optionHtml).join('')+
       '</select>'+
-      (d.hd ? '<span class="tag-hd">高清通道</span>'
-            : '<span class="tag-fallback">降级通道 · 仅默认档</span>')+
+      channelTag+
       '</div>';
     $('qsel').onchange = e => {
       currentIdx = parseInt(e.target.value, 10) || 0;
@@ -1131,9 +1141,7 @@ function renderMedia(d, opt){
       if(a){ a.href = dl(currentUrl(), current.filename + '.mp4'); }
     };
   }else if(isVideo){
-    qbox.innerHTML = '<div class="quality">'+
-      (d.hd ? '<span class="tag-hd">高清通道</span>'
-            : '<span class="tag-fallback">降级通道 · 仅默认档</span>')+'</div>';
+    qbox.innerHTML = '<div class="quality">'+channelTag+'</div>';
   }else{
     qbox.innerHTML = '';
   }
@@ -1187,6 +1195,8 @@ function renderMedia(d, opt){
 
 function renderDouyin(d){
   dlPlatform = 'douyin';
+  // 抖音：档位下拉保留，但**默认选中最高档**（见 renderMedia 里的 optionHtml）。
+  // 抖音的档位来自高清通道（需 x-tt-argus 头），拿到的是 bit_rate 多档。
   return renderMedia(d, {});
 }
 

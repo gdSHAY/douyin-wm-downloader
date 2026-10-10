@@ -15,6 +15,9 @@
     5. 图集取「无水印且分辨率最高」变体，实况照片额外输出动态视频（无水印）；
     6. 降级链路的 play 直链常有「只有一条」的问题，按同 video_id 派生多主机备源
        （`play_variants`），交给服务端取流层换链 —— 见下方 PLAY_HOSTS 注释。
+    7. 默认优先走带 `a_bogus` 签名的**高清通道**（`douyin_hd.HDClient`），
+       可拿到 `bit_rate` 多档清晰度；该通道需要 `x-tt-argus` 请求头，
+       注释与实测记录见 douyin_hd.py。
 """
 
 from __future__ import annotations
@@ -69,11 +72,16 @@ ILLEGAL_FILENAME = re.compile(r'[\\/:*?"<>|\r\n\t]')
 #
 # ★ 为什么需要（2026-10-10 实测，用户报「这条抖音链接下载不成功」时查出来的）：
 #
-# 高清通道被抖音的 Argus 风控挡死后（响应体 `Blocked by ArgusSecurityPlugin
-# Uifid Not Found`），所有抖音作品都走分享页降级链路；而降级链路给出的
-# `play_addr.url_list` **实测只有一条**直链，`download_addr` / `bit_rate` 都是空。
-# 一条直链 + 零备胎 = 单点失败：那条链所在的 CDN 节点抖动、或被出口挡住，
-# 用户看到的就是「解析成功，但下载失败」，而且没有任何可换的候选。
+# 降级链路（分享页）给出的 `play_addr.url_list` **实测只有一条**直链，
+# `download_addr` / `bit_rate` 都是空。一条直链 + 零备胎 = 单点失败：那条链
+# 所在的 CDN 节点抖动、或被出口挡住，用户看到的就是「解析成功，但下载失败」，
+# 而且没有任何可换的候选。
+#
+# （顺带更正一个曾写在此处的错误结论：那时以为「高清通道被 Argus 挡死、
+#   所有作品都只能走分享页」。**不是**——真正缺的只是一个 `x-tt-argus`
+#   请求头，详见 douyin_hd.py 里 ARGUS_HEADER 的注释。高清通道恢复后
+#   取到的是 `bit_rate` 多档，`play_addr` 也有 3 条，但本函数照样要做：
+#   `bit_rate` 各档各自的 `play_addr` 仍可能只有一条主链。）
 #
 # 实测同一个 `video_id` 在三台主机上取到的文件**字节完全相同**
 #（2026-10-10：14668063 B / ratio=720p），所以把这三台互设备源是零风险的：
