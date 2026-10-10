@@ -99,7 +99,7 @@
 
 | | |
 | --- | --- |
-| 文件 | `multipldl-1.0.11-arm64-v8a-debug.apk`（≈ 24 MB） |
+| 文件 | `multipldl-1.0.11-arm64-v8a-debug.apk`（23.8 MB） |
 | 架构 | `arm64-v8a`（2017 年之后绝大多数手机） |
 | 签名 | **debug 签名**，安装时需允许「未知来源」；未做 release 签名 |
 

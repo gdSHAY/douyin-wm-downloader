@@ -97,7 +97,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.11-arm64-v8a-debug.apk` (≈ 24 MB) |
+| File | `multipldl-1.0.11-arm64-v8a-debug.apk` (23.8 MB) |
 | ABI | `arm64-v8a` (virtually every phone since 2017) |
 | Signing | **debug-signed** — you must allow installs from unknown sources; no release signing yet |
 
