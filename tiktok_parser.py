@@ -76,6 +76,8 @@ import runtime_paths
 
 WEB = "https://www.tiktok.com"
 ITEMS_API = WEB + "/player/api/v1/items"
+#: 嵌入式页（备用取数通道，见 `_fetch_embed_meta` 的说明）
+EMBED_PAGE = WEB + "/embed/v2/%s"
 
 # 实测：用桌面 Chrome UA 才能稳定拿到网页数据（默认 UA 会被挑战）
 UA = (
@@ -88,6 +90,13 @@ WEB_HEADERS = {
     "Referer": WEB + "/",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
+    # ★ 显式写死，不让 urllib3 自己按「本机装了哪些解码器」去声明（2026-10-10 改）：
+    # urllib3 默认会按运行环境动态拼出 `gzip, deflate[, br][, zstd]`。桌面装了
+    # brotli 就发 `..., br`，TikTok 于是回 `Content-Encoding: br`；而 APK 的
+    # 打包依赖里**没有 brotli**，两端发出的头不同、拿到不同编码的响应体。
+    # 一旦「声明了 br 却没有解码器」就是解码异常；显式锁成 gzip/deflate
+    # 可以让所有平台行为一致、可预测（实测 gzip 与 br 两种响应都能正常解析）。
+    "Accept-Encoding": "gzip, deflate",
     "Sec-Fetch-Dest": "document",
     "Sec-Fetch-Mode": "navigate",
     "Upgrade-Insecure-Requests": "1",
@@ -332,6 +341,20 @@ def _session(proxy: str) -> requests.Session:
         return session
 
 
+#: 取数诊断（线程内）：记录各通道这一发的实况，供失败时拼进报错。
+#: 用 threading.local 而不是全局变量 —— 服务端是多线程的，诊断信息不能串台。
+_diag_state = threading.local()
+
+
+def _diag() -> Dict[str, Any]:
+    """当前线程的诊断暂存 dict（首次访问时创建）。"""
+    store = getattr(_diag_state, "store", None)
+    if store is None:
+        store = {}
+        _diag_state.store = store
+    return store
+
+
 def _offline_hint(detail: str) -> str:
     """连不上 TikTok 时的可操作提示。
 
@@ -425,6 +448,8 @@ def _fetch_web_meta(session: requests.Session, video_id: str, proxy: str) -> Dic
     match = re.search(
         r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>', resp.text or "", re.S
     )
+    _diag()["web"] = "HTTP %s / %d B / 网页内嵌数据 %s" % (
+        resp.status_code, len(resp.text or ""), "有" if match else "无")
     if not match:
         return {}
     try:
@@ -452,14 +477,112 @@ def _fetch_items_api(session: requests.Session, video_id: str) -> Dict[str, Any]
             timeout=40,
         )
     except requests.RequestException:
+        _diag()["items"] = "请求异常"
         return {}
     if resp.status_code != 200:
+        _diag()["items"] = "HTTP %s" % resp.status_code
         return {}
     try:
         items = (resp.json() or {}).get("items") or []
     except ValueError:
+        _diag()["items"] = "HTTP 200 / 非 JSON"
         return {}
+    _diag()["items"] = "HTTP 200 / %d 条" % len(items)
     return items[0] if items else {}
+
+
+def _fetch_embed_meta(session: requests.Session, video_id: str) -> Dict[str, Any]:
+    """备用取数通道：嵌入式页（Frontity 渲染分支）。
+
+    ★ 为什么需要它（2026-10-10 加，起因：安卓 APK 上报「所有 TikTok 链接都
+      失败：没能取到该作品的数据」）：
+
+    主入口 `_fetch_web_meta` 读的是 `www.tiktok.com/@i/video/{id}` 里 **webapp
+    分支**的 `__UNIVERSAL_DATA_FOR_REHYDRATION__`；嵌入式页走的是**另一套服务端
+    渲染**（Frontity，数据在 `__FRONTITY_CONNECT_STATE__`）。两条路用的 CDN 与
+    风控策略彼此独立 —— 实测同一个出口下两者都正常，但主入口在部分网络环境里会
+    被换成「HTTP 200 但整页没有内嵌数据」的空壳页，此时 embed 页往往还是好的。
+
+    返回结构与 `_fetch_web_meta` 的 `itemStruct` **对齐**（desc / author /
+    stats / video），所以上层可以无差别使用；它没有 `bitrateInfo`，档位会由
+    `_from_play_addr` 兜底路径构建（宽高取自 `videoMeta`，实测 1080×1920）。
+
+    取不到任何东西时返回 `{}`，不抛异常 —— 它本身就是兜底，不该再制造失败。
+    """
+    try:
+        resp = session.get(EMBED_PAGE % video_id, timeout=35)
+    except requests.RequestException:
+        _diag()["embed"] = "请求异常"
+        return {}
+    if resp.status_code != 200:
+        _diag()["embed"] = "HTTP %s" % resp.status_code
+        return {}
+
+    match = re.search(
+        r'<script[^>]*id="__FRONTITY_CONNECT_STATE__"[^>]*>(.*?)</script>',
+        resp.text or "", re.S,
+    )
+    _diag()["embed"] = "HTTP %s / %d B / 嵌入页数据 %s" % (
+        resp.status_code, len(resp.text or ""), "有" if match else "无")
+    if not match:
+        return {}
+    try:
+        data = json.loads(match.group(1))
+    except ValueError:
+        return {}
+
+    # 数据在 source.data.<路由路径>.videoData；路由路径随 id 变化，故不写死
+    node = ((data.get("source") or {}).get("data") or {})
+    infos: Dict[str, Any] = {}
+    authors: Dict[str, Any] = {}
+    for value in node.values():
+        if isinstance(value, dict) and isinstance(value.get("videoData"), dict):
+            payload = value["videoData"]
+            infos = payload.get("itemInfos") or {}
+            authors = payload.get("authorInfos") or {}
+            break
+    if not infos:
+        return {}
+
+    video = infos.get("video") or {}
+    meta = video.get("videoMeta") or {}
+    urls = [u for u in (video.get("urls") or []) if isinstance(u, str) and u]
+    covers = [c for c in (infos.get("covers") or []) if isinstance(c, str) and c]
+    author_covers = authors.get("covers")
+    avatar = author_covers[0] if isinstance(author_covers, list) and author_covers else ""
+
+    def _int(value: Any) -> int:
+        try:
+            return int(value or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    primary = urls[0] if urls else ""
+    return {
+        "id": str(infos.get("id") or video_id),
+        "desc": str(infos.get("text") or ""),
+        "createTime": _int(infos.get("createTime")),
+        "region": str(infos.get("locationCreated") or ""),
+        "author": {
+            "nickname": str(authors.get("nickName") or authors.get("nickname") or ""),
+            "uniqueId": str(authors.get("uniqueId") or authors.get("unique_id") or ""),
+            "avatarThumb": avatar,
+        },
+        "stats": {
+            "playCount": infos.get("playCount"),
+            "diggCount": infos.get("diggCount"),
+            "commentCount": infos.get("commentCount"),
+            "shareCount": infos.get("shareCount"),
+        },
+        "video": {
+            "width": _int(meta.get("width")),
+            "height": _int(meta.get("height")),
+            "duration": _int(meta.get("duration")),
+            "cover": covers[0] if covers else "",
+            "playAddr": primary,
+            "downloadAddr": primary,
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1026,6 +1149,7 @@ def _image_result(
 
 def parse(text: str) -> Dict[str, Any]:
     """解析一条 TikTok 链接，返回统一结构（与 bili_parser.parse 对齐）。"""
+    _diag().clear()
     url = extract_url(text)
     proxy, proxy_source = resolve_proxy()
 
@@ -1039,13 +1163,30 @@ def parse(text: str) -> Dict[str, Any]:
     except TikTokError as exc:
         item, web_error = {}, str(exc)
     api_item = _fetch_items_api(session, video_id)
+    source = "web"
+
+    # 备用通道：两个数据源都没给出内容时，改走嵌入式页。
+    # 它与主入口是两条彼此独立的服务端渲染分支（见 _fetch_embed_meta），
+    # 一侧被风控/返回空壳页时另一侧常仍可用。
+    # 刻意放在主路径之后：正常情况主入口一次命中，不该每次都多打一个请求。
+    if not item and not api_item:
+        embed_item = _fetch_embed_meta(session, video_id)
+        if embed_item:
+            item, source = embed_item, "web-embed"
 
     if not item and not api_item:
         if web_error:
             raise TikTokError(web_error)
+        detail = f"诊断：代理 {proxy or '未使用（直连）'}（来源 {proxy_source}）"
+        channels = "；".join(f"{name} 通道 {value}" for name, value in _diag().items())
+        if channels:
+            detail += f"；{channels}"
         raise TikTokError(
-            f"没能取到该作品的数据（id={video_id}）。可能是私密作品、已被删除，"
-            "或当前代理节点被 TikTok 风控；换一个节点后重试通常可解。"
+            f"没能取到该作品的数据（id={video_id}）。{detail}。"
+            "若在手机 / APK 上遇到：Android 的 Python **不会**自动走系统代理，"
+            "需在「⚙ 设置 → TikTok 代理」手填 http://127.0.0.1:7890，"
+            "或让代理客户端以 TUN/VPN 模式接管全部流量；"
+            "若代理确实已生效仍报此错，多半是该出口被 TikTok 风控 —— 换个节点重试。"
         )
 
     video = item.get("video") or {}
@@ -1061,14 +1202,13 @@ def parse(text: str) -> Dict[str, Any]:
     qualities = _dedupe(
         _from_profiles(api_video.get("profiles") or []) + _from_bitrate_info(video.get("bitrateInfo") or [])
     )
-    source = "web"
     yt_meta: Dict[str, Any] = {}
 
     # 兜底一：网页内嵌的 playAddr（零额外依赖）。
     # 实测 TikTok 的 bitrateInfo 与 profiles 会同时为空，这一步才是常态出口。
     if not qualities:
         qualities = _dedupe(_from_play_addr(video, api_item))
-        if qualities:
+        if qualities and source != "web-embed":
             source = "web-playaddr"
 
     # 兜底二：yt-dlp（代价：丢 fps，排序退化为 分辨率→码率；
@@ -1094,11 +1234,15 @@ def parse(text: str) -> Dict[str, Any]:
     music = (api_item.get("music_info") or {})
     web_music = item.get("music") or {}
 
-    hint = (
-        f"已自动选取最高画质：{best['label']}"
-        if len(qualities) > 1
-        else f"TikTok 网页端对该视频只提供 1 个档位：{best['label']}（这就是它能给到的最高画质）"
-    )
+    if len(qualities) > 1:
+        hint = f"已自动选取最高画质：{best['label']}"
+    elif source == "web-embed":
+        hint = (f"嵌入式页对该视频只提供 1 个档位：{best['label']}"
+                "（网页主入口未返回多档位，这就是能拿到的最好画质）")
+    else:
+        hint = f"TikTok 网页端对该视频只提供 1 个档位：{best['label']}（这就是它能给到的最高画质）"
+    if source == "web-embed":
+        hint += " · 本次由嵌入式页解析（网页主入口未返回数据，走的是另一条渲染通道）"
     if source == "web-playaddr":
         hint += " · 本次由网页内嵌直链解析（该作品未返回多档位，帧率不可得）"
     if source == "ytdlp":

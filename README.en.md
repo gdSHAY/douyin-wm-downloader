@@ -84,7 +84,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.10-win64.zip` (≈ 73 MB, ≈ 166 MB unpacked) |
+| File | `multipldl-1.0.11-win64.zip` (≈ 73 MB, ≈ 166 MB unpacked) |
 | Dependencies | **None** — Python 3.13 and ffmpeg are bundled |
 
 1. **Extract the whole folder** (⚠️ do *not* drag the `.exe` out on its own — `_internal/` is part of it)
@@ -97,7 +97,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.10-arm64-v8a-debug.apk` (23.8 MB) |
+| File | `multipldl-1.0.11-arm64-v8a-debug.apk` (≈ 24 MB) |
 | ABI | `arm64-v8a` (virtually every phone since 2017) |
 | Signing | **debug-signed** — you must allow installs from unknown sources; no release signing yet |
 
@@ -153,6 +153,17 @@ Measured: DNS resolves, but TCP 443 times out. **Without a proxy nothing can be 
 Open Settings → TikTok proxy (top-right), enter your local proxy (for Clash / FlClash that is usually `http://127.0.0.1:7890`), then click *Save & test* until it reports "TikTok reachable".
 
 > On an **overseas server** this flips: direct connection works, leave the proxy empty.
+
+> ⚠️ **On Android (APK) the proxy must be set again inside the app**: unlike the desktop
+> build (which picks up the system proxy), Android apps do **not** inherit the system or
+> Wi-Fi proxy settings. So even if your phone's browser opens TikTok fine, the APK may
+> still fail on every link. Two options:
+> ① enter the address under *Settings → TikTok proxy* inside the app;
+> ② run your proxy client in **TUN / VPN mode** so it captures all traffic.
+>
+> Since 1.0.11, when all three fetch channels come back empty the error message reports
+> **which proxy is in use** plus **each channel's HTTP status and response length** —
+> enough to tell "proxy not in effect" apart from "node got throttled".
 
 ### Bilibili needs ffmpeg for a playable file
 
