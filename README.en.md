@@ -76,6 +76,44 @@ Both source frames are `540×960`. Counting bright pixels (RGB all > 225) in the
 The originals are in the repository history and the scan is a few lines of PIL — reproduce it yourself.
 </details>
 
+## 👤 Creator pages: paste once, list everything they posted
+
+Pasting one video at a time gets old. Paste a **creator page** link (or just click the author name on any result) and the tool lists every work that account has published — and can remember them locally under "creators I follow".
+
+<div align="center">
+<img src="./docs/screenshot-user-zh.png" width="880" alt="Author shortcut and a Bilibili creator page">
+<br>
+<sub>Resolve any single video → click the <b>author name</b> ("全部作品 ›") → land on that creator's full list.<br>
+Top half: a Bilibili video. Bottom half: the same creator's page — followers, work count, bio, and the first page of their grid</sub>
+</div>
+
+<br>
+
+<div align="center">
+<img src="./docs/screenshot-follow-zh.png" width="880" alt="Work grid and follow list">
+<br>
+<sub>The grid supports selecting several works for batch download; the "creators I follow" card<br>
+remembers them and a "check for updates" pass badges any account with new works ("N new")</sub>
+</div>
+
+| Capability | Douyin | Bilibili |
+| --- | --- | --- |
+| List a creator's works | ✅ cursor paging | ✅ page-number paging (`space.bilibili.com/546195`) |
+| Batch download (selected) | ✅ queued server-side, survives page close | — |
+| Single work download | ✅ multiple quality tiers | ✅ open the card, server-side ffmpeg mux |
+| Save to follow list / new-work badge | ✅ | ✅ |
+
+> **Why Bilibili has no batch download**: Bilibili serves DASH with **separate video and audio
+> tracks**, so every file must be muxed by ffmpeg on the server. Faking a batch button would
+> silently save a folder of **silent videos** — worse than not offering it. Bilibili therefore
+> goes "open the card → resolve → download (muxed mp4)", and the UI says so.
+>
+> **TikTok / Xiaohongshu creator lists are not supported yet**: their list endpoints need extra
+> request signing (TikTok returns HTTP 200 with an empty body). Single-video parsing is unaffected.
+>
+> The follow list lives only in a local `follows.json` — never uploaded. Writes are atomic, and a
+> corrupted file degrades to an empty list instead of breaking the page.
+
 ## 📥 Download & install
 
 Grab a build from the [**Releases**](../../releases/latest) page. Both bundles **ship their own Python runtime** — no environment setup needed.
@@ -84,7 +122,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.11-win64.zip` (≈ 73 MB, ≈ 166 MB unpacked) |
+| File | `multipldl-1.0.12-win64.zip` (≈ 73 MB, ≈ 166 MB unpacked) |
 | Dependencies | **None** — Python 3.13 and ffmpeg are bundled |
 
 1. **Extract the whole folder** (⚠️ do *not* drag the `.exe` out on its own — `_internal/` is part of it)
@@ -97,7 +135,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.11-arm64-v8a-debug.apk` (23.8 MB) |
+| File | `multipldl-1.0.12-arm64-v8a-debug.apk` (23.9 MB) |
 | ABI | `arm64-v8a` (virtually every phone since 2017) |
 | Signing | **debug-signed** — you must allow installs from unknown sources; no release signing yet |
 

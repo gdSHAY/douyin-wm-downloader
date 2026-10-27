@@ -571,6 +571,37 @@ class BiliClient:
         resp.raise_for_status()
         return resp.content
 
+    # ---------- 用户空间（UP 主主页） ----------
+
+    def space_info(self, mid: str) -> Dict[str, Any]:
+        """UP 主名片：昵称 / 头像 / 签名。需要 WBI 签名，否则 -352 风控。"""
+        return self._request_json(
+            API + "/x/space/wbi/acc/info",
+            {"mid": str(mid), "platform": "web", "web_location": "1550101"},
+            signed=True,
+        ).get("data") or {}
+
+    def space_relation(self, mid: str) -> Dict[str, Any]:
+        """粉丝 / 关注数。**不签名**也能取，成本低；失败时调用方降级为 0。"""
+        return self._request_json(
+            API + "/x/relation/stat", {"vmid": str(mid)}
+        ).get("data") or {}
+
+    def space_videos(self, mid: str, pn: int = 1, ps: int = 30) -> Dict[str, Any]:
+        """UP 主投稿列表。`pn` 是**页码**（不是游标），`ps` 每页条数。"""
+        return self._request_json(
+            API + "/x/space/wbi/arc/search",
+            {
+                "mid": str(mid),
+                "ps": int(ps),
+                "pn": int(pn),
+                "order": "pubdate",
+                "platform": "web",
+                "web_location": "1550101",
+            },
+            signed=True,
+        ).get("data") or {}
+
 
 _CLIENTS: Dict[str, BiliClient] = {}
 _CLIENTS_LOCK = threading.Lock()
@@ -803,6 +834,9 @@ def parse(text: str, page: int = 0, sessdata: Optional[str] = None) -> Dict[str,
         "title": info.get("title") or "",
         "author": owner.get("name") or "",
         "author_avatar": owner.get("face") or "",
+        # UP 主 mid：前端据此把作者名做成「看 TA 的全部作品」入口。
+        # 之前只回昵称，结果解析完一个视频就没法顺着人往下走。
+        "author_mid": str(owner.get("mid") or ""),
         "cover": info.get("pic") or "",
         "desc": (info.get("desc") or "").strip(),
         "pubdate": info.get("pubdate") or 0,
@@ -843,3 +877,223 @@ def _duration_text(seconds: int) -> str:
     if hours:
         return f"{hours}:{minutes:02d}:{secs:02d}"
     return f"{minutes}:{secs:02d}"
+
+
+# ===========================================================================
+# 用户主页（UP 主空间）作品列表
+#
+# 走 `/x/space/wbi/arc/search`，与 playurl 共用同一套 WBI 签名与限速。
+# 实测（2026-10-27，登录态）：mid=2 → 43 条、mid=546195 → 681 条，
+# 分页用 `pn`（**页码**，与抖音的游标不同）+ `ps`（每页条数，实测 30 可用）。
+#
+# ⚠️ 主页列表**不返回清晰度信息**。B站 的档位要靠 `/x/player/wbi/playurl`
+# 逐条去问（还要按账号的登录/大会员身份给不同上限），所以这里只给「有哪些作品」，
+# 用户点开某一条时才走 `parse()` 拿多档 —— 否则列 30 条就要打 30 次接口，
+# 在 B站 的 -412 风控下几乎必然被拦。
+# ===========================================================================
+
+#: `https://space.bilibili.com/546195` / `space.bilibili.com/546195/video`
+SPACE_PATTERN = re.compile(r"space\.bilibili\.com/(\d{3,20})", re.IGNORECASE)
+#: 纯数字 mid（B站 的 mid 从 1 位数到 17 位数都有）。**上限刻意收在 12 位**：
+#: 抖音的 aweme_id 是 15~19 位纯数字，放开到 20 位就会把作品 id 误当成 UP 主 mid。
+MID_PATTERN = re.compile(r"\d{3,12}")
+
+#: 每页条数。实测 30 可用；B站 网页版自己用 30。
+SPACE_PAGE_SIZE = 30
+#: 单次连续翻页上限，防止 has_more 异常时打爆风控
+SPACE_MAX_PAGES = 20
+
+
+def looks_like_space(text: str) -> bool:
+    """这段内容是不是「UP 主主页」链接（而不是单个视频）。只做形态判断，不联网。"""
+    if not text:
+        return False
+    if SPACE_PATTERN.search(text):
+        return True
+    stripped = text.strip()
+    # 裸 mid：纯数字且不含 BV 号。作品 aid（av170001）不会被误判 —— 它带 av 前缀，
+    # 而 Space 链接里的 mid 是纯数字。
+    return bool(MID_PATTERN.fullmatch(stripped))
+
+
+def extract_mid(text: str) -> Optional[str]:
+    """从任意文本里取 UP 主 mid。取不到返回 None。"""
+    match = SPACE_PATTERN.search(text or "")
+    if match:
+        return match.group(1)
+    stripped = (text or "").strip()
+    if MID_PATTERN.fullmatch(stripped):
+        return stripped
+    return None
+
+
+def _space_duration_seconds(length: str) -> int:
+    """把列表里的 `12:34` / `1:02:03` 转成秒。列表接口不直接给秒数。"""
+    parts = [p for p in str(length or "").split(":") if p != ""]
+    if not parts:
+        return 0
+    try:
+        numbers = [int(p) for p in parts]
+    except ValueError:
+        return 0
+    seconds = 0
+    for value in numbers:
+        seconds = seconds * 60 + value
+    return seconds
+
+
+def normalize_space_post(item: Dict[str, Any], author: Dict[str, Any]) -> Dict[str, Any]:
+    """把 space 列表的一条作品归一化成前端既有契约（与抖音主页同一套字段）。
+
+    `qualities` 刻意留空：B站 的档位必须逐条问 playurl，见本节开头说明。
+    前端据此显示「点开解析」，而不是伪造一个档位。
+    """
+    bvid = item.get("bvid") or ""
+    title = (item.get("title") or "").strip()
+    # 列表里的标题带 <em class="keyword"> 高亮标签（搜索时才有），统一剥掉
+    title = re.sub(r"<[^>]+>", "", title)
+    duration = _space_duration_seconds(item.get("length"))
+    cover = item.get("pic") or ""
+    if cover.startswith("//"):
+        cover = "https:" + cover
+
+    safe_title = re.sub(r'[\\/:*?"<>|\r\n\t]', "_", title or "bilibili").strip()
+
+    return {
+        "platform": "bilibili",
+        "aweme_id": bvid,          # 复用 douyin 的字段名，前端 historyId/去重逻辑共用
+        "bvid": bvid,
+        "aid": item.get("aid") or 0,
+        "type": "video",
+        "title": title or "(无标题)",
+        "filename": safe_title or "bilibili",
+        "desc": (item.get("description") or "").strip(),
+        "cover": cover,
+        "duration": duration,
+        "create_time": item.get("created") or 0,
+        "author": {
+            "nickname": author.get("nickname") or "",
+            "uid": author.get("sec_uid") or "",
+            "sec_uid": author.get("sec_uid") or "",
+            "avatar": [author.get("avatar") or ""],
+        },
+        "stats": {
+            # B站 列表只给播放与弹幕，没有点赞 —— 不要编 0 之外的数
+            "digg": 0,
+            "play": item.get("play") or 0,
+            "comment": item.get("comment") or 0,
+            "danmaku": item.get("video_review") or 0,
+        },
+        "video_urls": [],
+        "images": [],
+        "qualities": [],
+        "hd": False,
+        "is_top": False,
+        "share_url": "https://www.bilibili.com/video/%s" % bvid,
+    }
+
+
+def fetch_space_profile(mid: str, sessdata: Optional[str] = None) -> Dict[str, Any]:
+    """UP 主资料（昵称 / 头像 / 签名 / 粉丝数）。
+
+    分两个接口：`acc/info` 有昵称头像签名、`relation/stat` 才有粉丝数。
+    粉丝数拿不到不影响主流程（列表照常能出），所以这里对它做降级处理。
+    """
+    client = get_client(sessdata)
+    try:
+        info = client.space_info(mid)
+    except BiliError:
+        raise
+    if not info:
+        raise BiliError("没能取到该 UP 主的资料（可能已注销、被封禁，或链接里的 mid 不完整）")
+
+    relation: Dict[str, Any] = {}
+    try:
+        relation = client.space_relation(mid)
+    except BiliError:
+        relation = {}
+
+    return {
+        "platform": "bilibili",
+        # sec_uid 是「本机关注列表里的用户标识」，对 B站 就是 mid —— 沿用同名字段，
+        # 让关注列表不必区分平台就能存/删/排序。
+        "sec_uid": str(info.get("mid") or mid),
+        "uid": str(info.get("mid") or mid),
+        "nickname": (info.get("name") or "").strip() or "B站 用户",
+        "unique_id": "",
+        "signature": (info.get("sign") or "").strip(),
+        "avatar": info.get("face") or "",
+        "follower_count": relation.get("follower") or 0,
+        "following_count": relation.get("following") or 0,
+        "total_favorited": 0,
+        "aweme_count": 0,          # 由调用方用 space 首屏的 page.count 回填
+        "url": "https://space.bilibili.com/%s" % (info.get("mid") or mid),
+    }
+
+
+def fetch_space_videos(
+    mid: str, pn: int = 1, sessdata: Optional[str] = None
+) -> Dict[str, Any]:
+    """取一页 UP 主作品。返回 {posts, cursor, has_more}，cursor 里放的是**下一页页码**。"""
+    client = get_client(sessdata)
+    data = client.space_videos(mid, pn=pn)
+    vlist = ((data.get("list") or {}).get("vlist")) or []
+    page = data.get("page") or {}
+
+    # 先取资料：列表条目里没有头像/昵称，得从 space_info 补
+    profile = fetch_space_profile(mid, sessdata)
+    posts = [normalize_space_post(item, profile) for item in vlist if isinstance(item, dict)]
+
+    total = int(page.get("count") or 0)
+    size = int(page.get("ps") or SPACE_PAGE_SIZE) or SPACE_PAGE_SIZE
+    done = int(page.get("pn") or pn) * size
+    return {
+        "posts": posts,
+        "cursor": str(int(page.get("pn") or pn) + 1),
+        "has_more": bool(vlist) and done < total,
+        "total": total,
+    }
+
+
+def parse_space(text: str, pn: int = 1, pages: int = 1,
+                sessdata: Optional[str] = None) -> Dict[str, Any]:
+    """UP 主主页入口：链接 -> {user, posts, cursor, has_more}。
+
+    与 `douyin_user.parse_user()` 的返回结构保持一致，`server.py` 因此可以
+    用同一套接口给前端，前端也只需要一套渲染。
+    """
+    mid = extract_mid(text)
+    if not mid:
+        raise BiliError(
+            "没能从这条链接里认出 UP 主。请打开他的个人空间、复制地址栏链接"
+            "（形如 https://space.bilibili.com/546195）；单个视频请直接粘视频链接。"
+        )
+
+    profile = fetch_space_profile(mid, sessdata)
+    posts: List[Dict[str, Any]] = []
+    cursor = str(pn)
+    has_more = True
+    total = 0
+
+    for _ in range(max(1, min(int(pages or 1), SPACE_MAX_PAGES))):
+        page = fetch_space_videos(mid, int(cursor), sessdata)
+        posts.extend(page["posts"])
+        cursor = page["cursor"]
+        has_more = page["has_more"]
+        total = page.get("total") or total
+        if not has_more:
+            break
+
+    # 列表里可能有置顶/重复条目，按 bvid 去重
+    seen = set()
+    unique: List[Dict[str, Any]] = []
+    for post in posts:
+        key = post.get("bvid") or post.get("aweme_id")
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(post)
+
+    profile["aweme_count"] = total or len(unique)
+    return {"user": profile, "posts": unique, "cursor": cursor, "has_more": has_more}
+

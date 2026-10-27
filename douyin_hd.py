@@ -156,6 +156,15 @@ class HDClient:
             self._ttwid = None
         return self._ttwid
 
+    def ttwid(self) -> Optional[str]:
+        """非登录态 ttwid 的公开入口。
+
+        用户主页模块（douyin_user）与详情接口走的是同一套网关、同一个匿名
+        凭据。抽这个薄封装，是为了让兄弟模块不必伸手去碰 `_ensure_ttwid`
+        这个私有名 —— 私有方法随时可能改签名。
+        """
+        return self._ensure_ttwid()
+
     def fetch_detail(self, aweme_id: str, timeout: int = 20) -> Dict[str, Any]:
         """获取作品完整详情，失败抛出 HDUnavailable。"""
         params = dict(BASE_PARAMS)

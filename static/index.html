@@ -111,6 +111,18 @@
   .author{display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .author img{width:32px;height:32px;border-radius:50%;object-fit:cover;background:#eee}
   .author span{font-size:14px;color:var(--text-2);font-weight:500}
+  /* 作者名做成入口：hover 出一层浅底、右侧露出「全部作品 ›」，
+     让「这里可以点」自解释，而不是靠用户去猜。 */
+  .author-link{
+    display:inline-flex;align-items:center;gap:8px;color:inherit;text-decoration:none;
+    padding:2px 8px 2px 2px;margin-left:-2px;border-radius:999px;
+    transition:background .15s;
+  }
+  .author-link:hover{background:#f1f2f4}
+  .author-link .author-go{
+    font-size:11.5px;font-weight:600;color:var(--brand);opacity:.72;white-space:nowrap;
+  }
+  .author-link:hover .author-go{opacity:1}
   .meta{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--text-2);margin-bottom:14px}
   .meta b{color:var(--text);font-weight:600}
 
@@ -217,6 +229,109 @@
     padding:3px 7px;border-radius:6px;
   }
   .del:hover{background:#fee2e2;color:#dc2626}
+
+  /* ---------------- 用户主页（记住用户 / 关注列表） ----------------
+     作品网格刻意用 aspect-ratio 3/4 而不是固定高度：抖音封面有竖屏也有横屏，
+     固定高度会把横屏封面裁成一条缝。用比例容器 + object-fit:cover 两头都能看。 */
+  #userCard{display:none}
+  .user-head{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  .user-avatar{
+    width:64px;height:64px;border-radius:50%;object-fit:cover;
+    background:#eef0f3;flex:0 0 auto;border:1px solid var(--line);
+  }
+  .user-main{flex:1;min-width:200px}
+  .user-name{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .user-id{font-size:12.5px;color:var(--text-2);margin-top:3px}
+  .user-sign{font-size:13px;color:var(--text-2);margin-top:8px;line-height:1.6;word-break:break-word}
+  .user-stats{display:flex;gap:16px;margin-top:10px;font-size:13px;color:var(--text-2);flex-wrap:wrap}
+  .user-stats b{color:var(--text);font-weight:700}
+  .user-follow{flex:0 0 auto}
+  .btn-follow{
+    background:#fff;color:var(--brand);border:1px solid var(--brand) !important;
+    padding:9px 18px;border-radius:10px;font-size:14px;font-weight:700;
+  }
+  .btn-follow:hover{background:#fff5f7}
+  .btn-follow.on{background:var(--brand);color:#fff;border-color:transparent !important}
+  .user-tools{
+    display:flex;gap:9px;flex-wrap:wrap;align-items:center;
+    margin:16px 0 12px;padding-top:14px;border-top:1px solid var(--line);
+  }
+  .pick-info{font-size:13px;color:var(--text-2);flex:1;min-width:120px}
+  .pick-info b{color:var(--text)}
+
+  .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .pcard{
+    position:relative;border:1px solid var(--line);border-radius:11px;overflow:hidden;
+    background:#fbfbfc;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .1s;
+    /* ★ min-width:0 不是可有可无的：grid 子项默认 min-width:auto（等于 min-content），
+       卡片里的标题/统计行一旦撑出 min-content，轨道就会被顶宽、整行溢出到容器外，
+       表现为「最后一列被右边框切掉」。 */
+    min-width:0;
+  }
+  .pcard:hover{border-color:#d3d6db;transform:translateY(-1px)}
+  .pcard.on{border-color:var(--brand);box-shadow:0 0 0 2px rgba(254,44,85,.12)}
+  .pcard .ph{position:relative;background:#0f1113;aspect-ratio:3/4;overflow:hidden}
+  .pcard .ph img{width:100%;height:100%;object-fit:cover;display:block}
+  .pcard .ph .noimg{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#8b93a1;font-size:12px;
+  }
+  .pcard .du{
+    position:absolute;right:5px;bottom:5px;background:rgba(0,0,0,.72);color:#fff;
+    font-size:11px;padding:2px 6px;border-radius:5px;letter-spacing:.2px;
+  }
+  .pcard .kind{
+    position:absolute;right:5px;top:5px;background:rgba(0,0,0,.66);color:#fff;
+    font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:5px;
+  }
+  .pcard .kind.img{background:rgba(254,44,85,.9)}
+  .pcard .top{
+    position:absolute;left:5px;top:5px;background:rgba(0,0,0,.66);color:#fff;
+    font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:5px;
+  }
+  .pcard .ck{
+    position:absolute;left:6px;top:6px;width:21px;height:21px;border-radius:6px;
+    background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.16);
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:800;color:#fff;line-height:1;z-index:2;
+  }
+  .pcard.on .ck{background:var(--brand);border-color:var(--brand)}
+  .pcard.on .ck:after{content:'✓'}
+  .pcard .pmeta{padding:7px 8px 8px}
+  .pcard .pt{
+    font-size:12.5px;line-height:1.45;height:36px;overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;
+  }
+  .pcard .ps{
+    font-size:11px;color:var(--text-2);margin-top:6px;
+    display:flex;justify-content:space-between;gap:6px;
+  }
+  .pcard .ps > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+  .pcard .ps .nw{color:#15803d;font-weight:600;flex:0 0 auto}
+
+  /* 关注列表 */
+  #followCard{display:none}
+  .follow-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(236px,1fr));gap:10px}
+  .fl-item{
+    display:flex;gap:10px;align-items:center;
+    border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:#fbfbfc;
+  }
+  .fl-item img{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:0 0 auto;background:#eef0f3}
+  .fl-main{flex:1;min-width:0}
+  .fl-name{
+    font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:flex;align-items:center;gap:6px;
+  }
+  .fl-sub{font-size:11.5px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .fl-ops{display:flex;gap:5px;flex:0 0 auto}
+  .fl-badge{
+    background:var(--brand);color:#fff;font-size:10.5px;font-weight:700;
+    padding:1px 6px;border-radius:999px;flex:0 0 auto;
+  }
+  .fl-note{
+    font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;
+    padding:1px 6px;border-radius:6px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
 
   footer{text-align:center;color:#9aa1ab;font-size:12px;line-height:1.8;margin-top:26px}
 
@@ -364,6 +479,39 @@
       <button class="btn-mini" id="btnClearHistory">清空全部</button>
     </div>
     <div id="history"></div>
+  </div>
+
+  <!-- ============ 用户主页：粘贴作者主页链接后出现 ============ -->
+  <div class="card" id="userCard">
+    <div class="user-head">
+      <img class="user-avatar" id="uAvatar" alt="" referrerpolicy="no-referrer">
+      <div class="user-main">
+        <div class="user-name" id="uName"></div>
+        <div class="user-id" id="uId"></div>
+        <div class="user-sign" id="uSign"></div>
+        <div class="user-stats" id="uStats"></div>
+      </div>
+      <div class="user-follow" id="uFollowBox"></div>
+    </div>
+
+    <div class="user-tools" id="uTools"></div>
+    <div class="pgrid" id="uGrid"></div>
+
+    <div class="row" id="uMoreRow" style="display:none">
+      <button class="btn-ghost" id="btnUserMore">加载更多</button>
+      <button class="btn-ghost" id="btnUserAll">加载全部作品</button>
+    </div>
+    <div class="hint" id="uHint"></div>
+  </div>
+
+  <!-- ============ 我关注的用户 ============ -->
+  <div class="card" id="followCard">
+    <div class="history-head">
+      <h3>我关注的用户 <span id="followCount"></span></h3>
+      <button class="btn-mini" id="btnFollowCheck">检查更新</button>
+    </div>
+    <div class="follow-list" id="followList"></div>
+    <div class="hint" id="followHint"></div>
   </div>
 
   <footer>
@@ -515,8 +663,8 @@ const PLATFORMS = {
     name: '抖音',
     color: '#fe2c55',
     grad: 'linear-gradient(135deg,#ff4d6a,#fe2c55)',
-    placeholder: '打开抖音App → 分享 → 复制链接，把整段文案粘贴到这里\n例如：7.89 gAh:/ 复制打开抖音，看看【xxx的作品】# xxx  https://v.douyin.com/xxxxx/',
-    hint: '支持分享短链（v.douyin.com）、网页长链（douyin.com/video/）、图集链接（douyin.com/note/）以及混合了中文口令的整段文案。',
+    placeholder: '打开抖音App → 分享 → 复制链接，把整段文案粘贴到这里\n也可以粘贴作者主页链接（douyin.com/user/MS4wLjABAAAA...）→ 列出TA的全部作品\n例如：7.89 gAh:/ 复制打开抖音，看看【xxx的作品】# xxx  https://v.douyin.com/xxxxx/',
+    hint: '支持分享短链（v.douyin.com）、网页长链（douyin.com/video/）、图集链接（douyin.com/note/）以及混合了中文口令的整段文案。★ 粘贴作者主页链接（含 /user/）可以列出该作者的全部作品，勾选后批量下载，并一键存进下方「我关注的用户」；解析结果里的「作者名」也能直接点，一样会跳过去。',
     demo: '2.84 nqe:/ 骑白马的也可以是公主%百万转场变身https://v.douyin.com/L4FJNR3/ 复制此链接，打开Dou音搜索，直接观看视频!',
     empty: '请先粘贴抖音分享链接'
   },
@@ -524,8 +672,8 @@ const PLATFORMS = {
     name: 'B站',
     color: '#fb7299',
     grad: 'linear-gradient(135deg,#fc9db9,#fb7299)',
-    placeholder: '粘贴 B站 视频链接，支持 BV 号 / av 号 / b23.tv 短链\n例如：https://www.bilibili.com/video/BV1cSec6tEux/ 或 BV1cSec6tEux',
-    hint: '支持 BV 号、av 号、b23.tv 短链与带 ?p= 分P参数的链接。清晰度取决于账号：未登录约 480P，配置 SESSDATA 后可到 1080P（大会员可到 4K）。',
+    placeholder: '粘贴 B站 视频链接，支持 BV 号 / av 号 / b23.tv 短链\n也可以粘贴 UP 主个人空间链接（space.bilibili.com/546195）→ 列出 TA 的全部作品\n例如：https://www.bilibili.com/video/BV1cSec6tEux/ 或 BV1cSec6tEux',
+    hint: '支持 BV 号、av 号、b23.tv 短链与带 ?p= 分P参数的链接。清晰度取决于账号：未登录约 480P，配置 SESSDATA 后可到 1080P（大会员可到 4K）。★ 粘贴 UP 主个人空间链接（含 space.bilibili.com）可以列出 TA 的全部作品；点解析结果里的作者名也能一键跳过去。',
     demo: 'https://www.bilibili.com/video/BV1cSec6tEux/',
     empty: '请先粘贴 B站 视频链接或 BV 号'
   },
@@ -594,6 +742,8 @@ function setPlatform(name, opts){
     current = null;
     bili = null;
     tt = null;
+    // 用户主页卡片只在抖音下有意义；切到别的平台还留着，会让人以为链接粘串了
+    $('userCard').style.display = 'none';
   }
   loadHistory();
 }
@@ -956,11 +1106,23 @@ async function doParse(){
   }
   const target = detected || platform;
 
+  // 用户主页走另一条链路：列出该作者的全部作品，而不是渲染单条。
+  // 判断放在平台识别之后 —— 主页链接里也含 douyin.com，必须先切到抖音再看形态。
+  if(isUserUrl(text)){
+    parseUser(text, target);
+    return;
+  }
+
   hideError();
   result.style.display = 'none';
   loading.style.display = 'block';
   btnParse.disabled = true;
   btnParse.textContent = '解析中…';
+
+  // 短链形式的「用户主页」在客户端分辨不出来（v.douyin.com/xxx 与作品短链长得一样），
+  // 所以留一条回退：作品解析报「无法识别作品 ID」时，再按主页试一次。
+  // 用 delegated 标记，避免本函数的 finally 把 parseUser 刚设好的 loading 状态冲掉。
+  let delegated = false;
 
   try{
     const res = await fetch(API_BASE + '/api/parse', {
@@ -970,7 +1132,17 @@ async function doParse(){
     });
     const json = await res.json();
     if(!json.success){
-      showError(json.error || '解析失败，请确认链接有效后重试');
+      const msg = json.error || '解析失败，请确认链接有效后重试';
+      // 粘错的形态有两种：作品链接被当主页、主页短链被当作品。
+      // 这里只兜「作品解析失败 → 也许是某人的主页」这一种，且必须能认出平台。
+      const maybeUser = (target === 'douyin' && /无法从链接中识别作品 ID/.test(msg))
+        || (target === 'bilibili' && /没识别出 BV 号/.test(msg));
+      if(maybeUser){
+        delegated = true;
+        parseUser(text, target);
+        return;
+      }
+      showError(msg);
       return;
     }
     if(json.platform === 'bilibili'){ renderBilibili(json.data); }
@@ -984,9 +1156,11 @@ async function doParse(){
       '然后用浏览器打开 ' + (API_BASE || location.origin) + ' 使用。原始错误：' + e.message
     );
   }finally{
-    loading.style.display = 'none';
-    btnParse.disabled = false;
-    btnParse.textContent = '开始解析';
+    if(!delegated){
+      loading.style.display = 'none';
+      btnParse.disabled = false;
+      btnParse.textContent = '开始解析';
+    }
   }
 }
 
@@ -1004,6 +1178,32 @@ const MEDIA_DEFAULTS = {
   liveLabel: '实况',
   authorFallback: '抖音用户'
 };
+
+/* 作者名 → 可点入口：解析完一条作品后，顺手就能看这个人的全部作品。
+   没有 uid 的平台（小红书 / TikTok）保持纯文本 —— 不做点了没反应的假链接。 */
+function authorHtml(avatar, name, platformName, uid){
+  const inner = (avatar ? '<img src="'+proxy(avatar)+'" alt="">' : '') +
+    '<span>@'+escapeHtml(name)+'</span>';
+  if(!uid) return inner;
+  return '<a class="author-link" href="javascript:void(0)" role="button"' +
+    ' data-author="'+escapeHtml(uid)+'"' +
+    ' data-platform="'+escapeHtml(platformName || 'douyin')+'"' +
+    ' title="查看 TA 的全部作品">' + inner +
+    '<span class="author-go">全部作品 ›</span></a>';
+}
+
+/* 打开某个作者的主页作品列表。抖音用 sec_uid、B站 用 mid，
+   两种链接都由后端 `/api/user/parse` 统一处理。 */
+async function openAuthor(platformName, uid){
+  let url = '';
+  if(platformName === 'douyin' && uid) url = 'https://www.douyin.com/user/' + uid;
+  else if(platformName === 'bilibili' && uid) url = 'https://space.bilibili.com/' + uid;
+  if(!url) return;
+
+  input.value = url;
+  await parseUser(url, platformName);
+  $('userCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
 
 /* 图集渲染（抖音 / 小红书 / TikTok 图文帖 共用）
    抽成独立函数的原因：三个平台共用同一份「images / image_items」契约，
@@ -1097,9 +1297,11 @@ function renderMedia(d, opt){
   $('title').title = d.title;
 
   const av = d.author_avatar || '';
-  $('author').innerHTML =
-    (av ? '<img src="'+proxy(av)+'" alt="">' : '') +
-    '<span>@'+escapeHtml((d.author && d.author.nickname) || opt.authorFallback)+'</span>';
+  const authorName = (d.author && d.author.nickname) || opt.authorFallback;
+  // 抖音的作品数据里带 sec_uid，据此把作者名做成「看 TA 的全部作品」入口；
+  // 小红书没有这个字段，authorHtml 会自动退化成纯文本。
+  const authorUid = (dlPlatform === 'douyin' && d.author && d.author.sec_uid) || '';
+  $('author').innerHTML = authorHtml(av, authorName, dlPlatform, authorUid);
 
   const meta = [];
   if(d.duration) meta.push('时长 <b>'+fmtDuration(d.duration)+'</b>');
@@ -1525,9 +1727,8 @@ function renderBilibili(d){
   $('title').innerHTML = escapeHtml(d.title) + '<span class="badge plat">B站</span>';
   $('title').title = d.title;
 
-  $('author').innerHTML =
-    (d.author_avatar ? '<img src="'+proxy(d.author_avatar)+'" alt="">' : '') +
-    '<span>@' + escapeHtml(d.author || 'UP主') + '</span>';
+  $('author').innerHTML = authorHtml(
+    d.author_avatar, d.author || 'UP主', 'bilibili', d.author_mid || '');
 
   const meta = [];
   if(d.duration) meta.push('时长 <b>'+fmtDuration(d.duration)+'</b>');
@@ -1860,6 +2061,626 @@ function clearAllHistory(btn){
   loadHistory();
 }
 
+/* ---------------- 用户主页 / 关注列表（「记住用户」） ----------------
+
+   产品意图：粘一次作者主页 → 看到他发过的全部作品 → 勾选批量下载 →
+   把这个人存进「我关注的用户」，下次回来一键看有没有更新。
+
+   与「单条解析」的分工（避免两套重复逻辑）：
+     · 这里只负责**列出**作品。主页列表接口自带 bit_rate 多档，够用了；
+     · 点某一条才回落到既有 /api/parse 拿详情（实况照片、来源标记只有那边有）。
+   两条链路的渲染共用同一张 result 卡片，没有第二套 UI 要维护。
+*/
+let userState = null;       // {user, posts, cursor, hasMore, followed, note, picked:Set}
+let userBusy = false;       // 解析 / 续页 互斥
+let userDownloading = false;
+let followUsers = [];
+let unfollowArmed = '';     // 二次确认：记住「已经点过一次取消」的 sec_uid
+
+/* 是否为「用户主页」链接。
+   支持抖音与 B站：这两家的主页作品列表都能稳定拿到（B站 复用已有的 WBI 签名）。
+   TikTok / 小红书需要额外的签名算法，见后端注释，这里不认它们，免得用户白点。
+   短链（v.douyin.com/xxx、b23.tv/xxx）在这里分辨不出来 —— 由 doParse 的失败回退兜住。 */
+function isUserUrl(text){
+  const raw = String(text || '');
+  const t = raw.trim();
+  if(/^MS4wLjABAAAA[A-Za-z0-9_\-]+$/.test(t)) return true;
+  if(/space\.bilibili\.com\/\d{3,12}/i.test(raw)) return true;
+  return /douyin\.com\/user\//i.test(raw) || /iesdouyin\.com\/share\/user\//i.test(raw);
+}
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function setUserHint(text, busy){
+  const el = $('uHint');
+  el.innerHTML = busy
+    ? '<span class="spinner" style="width:12px;height:12px;border-width:2px;margin-right:6px;vertical-align:-1px"></span>' + escapeHtml(text)
+    : escapeHtml(text);
+}
+
+function setFollowHint(text){
+  $('followHint').textContent = text || '';
+}
+
+/* ---- 解析 ---- */
+async function parseUser(text, platformName){
+  if(userBusy) return;
+  userBusy = true;
+  hideError();
+  result.style.display = 'none';
+  loading.style.display = 'block';
+  btnParse.disabled = true;
+  btnParse.textContent = '读取主页…';
+
+  try{
+    const res = await fetch(API_BASE + '/api/user/parse', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text, platform: platformName || 'douyin', pages: 1})
+    });
+    const json = await res.json();
+    if(!json.success){
+      showError(json.error || '用户主页解析失败，请确认链接是该作者的主页地址');
+      return;
+    }
+    renderUser(json.data);
+  }catch(e){
+    showError(
+      '无法连接本地解析服务（' + (API_BASE || location.origin) + '）。请确认服务窗口还开着。' +
+      '原始错误：' + e.message
+    );
+  }finally{
+    loading.style.display = 'none';
+    btnParse.disabled = false;
+    btnParse.textContent = '开始解析';
+    userBusy = false;
+  }
+}
+
+/* ---- 渲染 ---- */
+function renderUser(data){
+  const u = data.user || {};
+  const platformName = (u.platform || 'douyin').toLowerCase();
+  const isBili = platformName === 'bilibili';
+  // 封面/头像都要经 /api/proxy 带 Referer，平台标记必须是对的，
+  // 否则图床会按「未知来源」拒绝（表现为一片灰块）。
+  dlPlatform = platformName;
+
+  userState = {
+    user: u,
+    posts: data.posts || [],
+    cursor: data.cursor || '',
+    hasMore: !!data.has_more,
+    followed: !!data.followed,
+    note: data.note || '',
+    picked: new Set()
+  };
+  unfollowArmed = '';
+
+  $('userCard').style.display = 'block';
+  $('uAvatar').src = u.avatar ? proxy(u.avatar) : '';
+  $('uAvatar').alt = u.nickname || '';
+  $('uName').textContent = u.nickname || (isBili ? 'B站 用户' : '抖音用户');
+  $('uId').textContent = isBili
+    ? ('B站 UID ' + (u.uid || ''))
+    : (u.unique_id ? ('抖音号 ' + u.unique_id) : ('UID ' + (u.uid || '')));
+  $('uSign').textContent = u.signature || '';
+  $('uSign').style.display = u.signature ? 'block' : 'none';
+  $('uStats').innerHTML =
+    '粉丝 <b>' + fmt(u.follower_count) + '</b>' +
+    (u.total_favorited ? '获赞 <b>' + fmt(u.total_favorited) + '</b>' : '') +
+    '作品 <b>' + fmt(u.aweme_count) + '</b>' +
+    (u.following_count ? '关注 <b>' + fmt(u.following_count) + '</b>' : '');
+
+  renderFollowButton();
+  renderUserGrid();
+  renderUserTools();
+  updateMoreRow();
+  setUserHint(userState.posts.length
+    ? (isBili
+        // B站 的播放地址是 DASH 的音视频分离轨道，必须服务端 ffmpeg 合流，
+        // 所以这里不做批量下载 —— 假装能批量、点下去存出无声视频，比不给更糟。
+        ? '点封面打开单条详情下载 —— B站 视频要在服务端把音视频轨合流，所以走单条。'
+        : '点封面看单条详情，点左上角方框勾选后可批量下载 —— 下载走服务端，关掉页面也会继续。')
+    : '这位用户还没有公开作品（或全部设为私密）。');
+}
+
+function renderFollowButton(){
+  if(!userState){ $('uFollowBox').innerHTML = ''; return; }
+  const on = userState.followed;
+  const btn = document.createElement('button');
+  btn.className = 'btn-follow' + (on ? ' on' : '');
+  btn.id = 'btnFollow';
+  btn.textContent = on ? '✓ 已关注' : '☆ 关注此人';
+  btn.onclick = onFollowClick;
+  const box = $('uFollowBox');
+  box.innerHTML = '';
+  box.appendChild(btn);
+}
+
+function renderUserTools(){
+  if(!userState) return;
+  const total = userState.posts.length;
+  const picked = userState.picked.size;
+  const isBili = (userState.user.platform || '').toLowerCase() === 'bilibili';
+
+  if(isBili){
+    // 见 renderUser 里的说明：B站 的 DASH 轨道必须合流，不做批量下载按钮。
+    $('uTools').innerHTML =
+      '<span class="pick-info">共 <b>' + total + '</b> 条作品 · B站 需服务端合流，请点封面逐条下载</span>';
+    return;
+  }
+
+  $('uTools').innerHTML =
+    '<span class="pick-info">共 <b>' + total + '</b> 条作品 · 已选 <b>' + picked + '</b> 条</span>' +
+    '<button class="btn-mini" data-act="all">全选</button>' +
+    '<button class="btn-mini" data-act="none">取消选择</button>' +
+    '<button class="btn-dl" style="border:none;padding:9px 16px;font-size:13.5px"' +
+      (picked ? '' : ' disabled') + ' data-act="dl-picked">⬇ 下载选中</button>' +
+    '<button class="btn-dl gray" style="border:none;padding:9px 16px;font-size:13.5px" data-act="dl-all">⬇ 下载全部</button>';
+}
+
+function renderUserGrid(){
+  if(!userState) return;
+  const box = $('uGrid');
+  const posts = userState.posts;
+  const isBili = ((userState.user.platform || '') === 'bilibili');
+  if(!posts.length){ box.innerHTML = ''; return; }
+
+  box.innerHTML = posts.map((p, i) => {
+    const on = userState.picked.has(i);
+    const cover = p.cover || (p.images && p.images[0]) || '';
+    const imgCount = (p.images || []).length;
+    const kind = p.type === 'images'
+      ? '<span class="kind img">图集' + (imgCount > 1 ? ' ' + imgCount : '') + '</span>'
+      : (p.is_top ? '<span class="kind">置顶</span>' : '');
+    const dur = p.duration ? '<span class="du">' + fmtDuration(p.duration) + '</span>' : '';
+    const best = (p.type !== 'images' && p.qualities && p.qualities.length)
+      ? '<span class="nw">' + escapeHtml(
+          String(p.qualities[0].label || '')
+            .split(' · ')[0]                 // 去掉码率，卡片上放不下
+            .replace(/\s*\(H265\)/i, '')     // 编码信息留给单条详情页
+        ) + '</span>'
+      : '';
+    // B站 的列表接口只给播放量、没有点赞 —— 不要拿 0 去充数，
+    // 界面上出现一屏「0 赞」会让人以为数据没取到。
+    const statText = isBili
+      ? fmt((p.stats && p.stats.play) || 0) + ' 播放'
+      : fmt((p.stats && p.stats.digg) || 0) + ' 赞';
+
+    return '<div class="pcard' + (on ? ' on' : '') + '" data-idx="' + i + '">' +
+      '<div class="ph">' +
+        (cover
+          ? '<img src="' + proxy(cover) + '" loading="lazy" alt="">'
+          : '<div class="noimg">无封面</div>') +
+        '<div class="ck"></div>' + kind + dur +
+      '</div>' +
+      '<div class="pmeta">' +
+        '<div class="pt">' + escapeHtml(p.title || '(无标题)') + '</div>' +
+        '<div class="ps"><span>' + statText + '</span>' + best + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function updateMoreRow(){
+  $('uMoreRow').style.display = (userState && userState.hasMore) ? 'flex' : 'none';
+}
+
+function togglePick(index){
+  if(!userState) return;
+  if(userState.picked.has(index)) userState.picked.delete(index);
+  else userState.picked.add(index);
+  const card = $('uGrid').querySelector('.pcard[data-idx="' + index + '"]');
+  if(card) card.classList.toggle('on', userState.picked.has(index));
+  renderUserTools();
+}
+
+/* ---- 单条详情：复用既有 result 卡片 ---- */
+async function openPost(index){
+  if(!userState) return;
+  const post = userState.posts[index];
+  if(!post) return;
+  input.value = post.share_url;
+  await doParse();
+  if(result.style.display !== 'none'){
+    result.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+}
+
+/* ---- 加载更多 ---- */
+async function loadMoreUser(all){
+  if(!userState || userBusy) return;
+  userBusy = true;
+  const btn = all ? $('btnUserAll') : $('btnUserMore');
+  const label = btn.textContent;
+  btn.disabled = true;
+
+  let guard = 0;
+  try{
+    do{
+      btn.textContent = '加载中… 已有 ' + userState.posts.length + ' 条';
+      const res = await fetch(API_BASE + '/api/user/more', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          sec_uid: userState.user.sec_uid,
+          platform: userState.user.platform || 'douyin',
+          cursor: userState.cursor,
+          count: 18
+        })
+      });
+      const json = await res.json();
+      if(!json.success){
+        showError(json.error || '加载更多失败');
+        break;
+      }
+      const page = json.data || {};
+      const known = {};
+      userState.posts.forEach(p => { known[p.aweme_id] = 1; });
+      const fresh = (page.posts || []).filter(p => !known[p.aweme_id]);
+      userState.posts = userState.posts.concat(fresh);
+      userState.cursor = page.cursor || userState.cursor;
+      userState.hasMore = !!page.has_more;
+
+      renderUserGrid();
+      renderUserTools();
+      updateMoreRow();
+
+      // 接口返回了空页却没有 has_more=0：防死循环
+      if(!fresh.length) break;
+      if(++guard >= 30) break;
+    }while(all && userState.hasMore);
+
+    setUserHint('已加载 ' + userState.posts.length + ' 条作品' +
+      (userState.hasMore ? '，还有更多。' : '，已到底。'));
+  }catch(e){
+    showError('加载更多失败：' + e.message);
+  }finally{
+    userBusy = false;
+    if(document.body.contains(btn)){
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  }
+}
+
+/* ---- 批量下载 ----
+   逐条走 /api/parse 拿「当前有效」的直链，再交给 /api/save 建任务。
+   为什么不直接用主页列表里那份直链：列表可能已经在标签页里放了很久，
+   抖音的播放直链带时效签名；重新解析一次只多约 1 秒，却能把 403 挡在门外。
+   任务建完由服务端排队下载，所以这个循环很快，关掉页面也会继续下。 */
+async function fetchPostDetail(url){
+  try{
+    const res = await fetch(API_BASE + '/api/parse', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text: url, platform: 'douyin'})
+    });
+    const json = await res.json();
+    return json.success ? json.data : null;
+  }catch(e){ return null; }
+}
+
+async function savePostDetail(d){
+  if(!d) return false;
+
+  if(d.qualities && d.qualities.length){
+    const name = d.filename + '.mp4';
+    const source = '/api/download?url=' + encodeURIComponent(d.qualities[0].url) +
+      '&name=' + encodeURIComponent(name) + '&platform=douyin';
+    const res = await fetch(API_BASE + '/api/save', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({kind:'url', source, name})
+    });
+    return !!res.ok;
+  }
+
+  if(d.images && d.images.length){
+    const items = [];
+    const list = (Array.isArray(d.image_items) && d.image_items.length)
+      ? d.image_items
+      : d.images.map((u, i) => ({index: i + 1, url: u}));
+    list.forEach(it => {
+      if(it.url) items.push({url: it.url, name: d.filename + '_' + padIdx(it.index) + '.jpg'});
+      if(it.live && it.live.url){
+        items.push({url: it.live.url, name: d.filename + '_' + padIdx(it.index) + '_live.mp4'});
+      }
+    });
+    if(!items.length) return false;
+    const res = await fetch(API_BASE + '/api/save', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({kind:'zip', items, name: d.filename})
+    });
+    return !!res.ok;
+  }
+  return false;
+}
+
+async function downloadPosts(list){
+  if(!list || !list.length){ setUserHint('没有可下载的作品'); return; }
+  if(userDownloading){ setUserHint('上一批还在提交中，请稍等…'); return; }
+
+  userDownloading = true;
+  renderUserTools();
+  let ok = 0, fail = 0;
+
+  for(let i = 0; i < list.length; i++){
+    setUserHint('正在解析并提交 ' + (i + 1) + '/' + list.length +
+      '（已提交 ' + ok + ' 条，失败 ' + fail + ' 条）…', true);
+    const detail = await fetchPostDetail(list[i].share_url);
+    let started = false;
+    try{
+      started = await savePostDetail(detail);
+    }catch(e){ started = false; }
+    if(started) ok++; else fail++;
+    await sleep(200);   // 轻微间隔，避免瞬间打满接口
+  }
+
+  userDownloading = false;
+  renderUserTools();
+  setUserHint('已提交 ' + ok + ' 条下载任务' + (fail ? '，' + fail + ' 条未能提交' : '') +
+    '。进度见右下角面板，关掉页面也会继续。');
+  saveWatch();
+}
+
+/* ---- 关注 / 取消关注 ---- */
+async function onFollowClick(){
+  if(!userState) return;
+  const btn = $('btnFollow');
+  const sec = userState.user.sec_uid;
+
+  if(!userState.followed){
+    if(btn){ btn.disabled = true; btn.textContent = '保存中…'; }
+    try{
+      const payload = Object.assign({}, userState.user);
+      if(userState.posts.length) payload.last_aweme_id = userState.posts[0].aweme_id;
+      const res = await fetch(API_BASE + '/api/follows', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({user: payload})
+      });
+      const json = await res.json();
+      if(!json.success){
+        showError(json.error || '关注失败');
+        renderFollowButton();
+        return;
+      }
+      userState.followed = true;
+      renderFollowButton();
+      setUserHint('已加入关注列表。下次点下方「检查更新」就能看到这位有没有新作品。');
+      await loadFollows();
+    }catch(e){
+      showError('关注失败：' + e.message);
+      renderFollowButton();
+    }
+    return;
+  }
+
+  // 取消关注：两步，避免手滑
+  if(unfollowArmed !== sec){
+    unfollowArmed = sec;
+    if(btn) btn.textContent = '确认取消关注？';
+    setTimeout(() => {
+      if(unfollowArmed === sec && userState && userState.user.sec_uid === sec){
+        unfollowArmed = '';
+        renderFollowButton();
+      }
+    }, 4000);
+    return;
+  }
+
+  unfollowArmed = '';
+  if(btn){ btn.disabled = true; btn.textContent = '移除中…'; }
+  try{
+    await fetch(API_BASE + '/api/follows/delete', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sec_uid: sec})
+    });
+    userState.followed = false;
+    renderFollowButton();
+    setUserHint('已从关注列表移除。');
+    await loadFollows();
+  }catch(e){
+    showError('取消关注失败：' + e.message);
+    renderFollowButton();
+  }
+}
+
+/* ---- 关注列表 ---- */
+async function loadFollows(){
+  try{
+    const res = await fetch(API_BASE + '/api/follows');
+    const data = await res.json();
+    followUsers = data.users || [];
+    renderFollows(data);
+  }catch(e){
+    // 服务没起来时静默：这不该在首屏弹错误，主流程有自己的提示
+  }
+}
+
+function renderFollows(data){
+  // 以参数为准并回写到模块状态：调用方（loadFollows）拿到的是最新数据，
+  // 让函数自己记住它，避免"传了 A 却渲染 B"这类只会在改动后暴露的错位。
+  if(data && Array.isArray(data.users)) followUsers = data.users;
+
+  const card = $('followCard');
+  if(!followUsers.length){
+    card.style.display = 'none';
+    $('followList').innerHTML = '';
+    return;
+  }
+  card.style.display = 'block';
+  $('followCount').textContent = '（' + followUsers.length + ' / ' + ((data && data.limit) || 300) + '）';
+
+  $('followList').innerHTML = followUsers.map(u => {
+    const sec = escapeHtml(u.sec_uid || '');
+    const badge = u.new_count
+      ? '<span class="fl-badge">' + (u.new_count >= 18 ? '18+' : u.new_count) + ' 新</span>'
+      : '';
+    const sub = u.note
+      ? '<span class="fl-note" title="' + escapeHtml(u.note) + '">' + escapeHtml(u.note) + '</span>'
+      : escapeHtml('@' + (u.unique_id || '—') + ' · ' + fmt(u.follower_count) + ' 粉丝');
+    return '<div class="fl-item" data-sec="' + sec + '">' +
+      (u.avatar ? '<img src="' + proxy(u.avatar) + '" loading="lazy" alt="">' : '<img alt="">') +
+      '<div class="fl-main">' +
+        '<div class="fl-name">' + escapeHtml(u.nickname || '抖音用户') + badge + '</div>' +
+        '<div class="fl-sub">' + sub + '</div>' +
+      '</div>' +
+      '<div class="fl-ops">' +
+        '<button class="btn-mini" data-note="' + sec + '">备注</button>' +
+        '<button class="del" data-unfollow="' + sec + '" title="取消关注">×</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function openFollowedUser(secUid){
+  const u = followUsers.find(x => x.sec_uid === secUid);
+  // 抖音与 B站 的主页地址都能由 (平台, id) 直接拼出来，走同一个入口，
+  // 免得「从关注列表进」和「从作者名进」两条路各维护一份。
+  await openAuthor((u && u.platform) || 'douyin', secUid);
+}
+
+async function saveNote(secUid, note){
+  try{
+    await fetch(API_BASE + '/api/follows/note', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sec_uid: secUid, note})
+    });
+  }catch(e){}
+  await loadFollows();
+}
+
+function editNote(item, secUid){
+  const sub = item.querySelector('.fl-sub');
+  if(!sub || sub.querySelector('input')) return;
+  const current = (followUsers.find(x => x.sec_uid === secUid) || {}).note || '';
+  sub.innerHTML = '<input type="text" maxlength="40" placeholder="备注，如：苏州探店" ' +
+    'style="width:100%;font:inherit;font-size:11.5px;padding:2px 6px;border:1px solid var(--line);' +
+    'border-radius:5px;outline:none">';
+  const field = sub.querySelector('input');
+  field.value = current;
+  field.focus();
+
+  let done = false;
+  const commit = () => {
+    if(done) return;
+    done = true;
+    saveNote(secUid, field.value.trim());
+  };
+  field.onkeydown = ev => {
+    if(ev.key === 'Enter'){ ev.preventDefault(); commit(); }
+    if(ev.key === 'Escape'){ done = true; loadFollows(); }
+  };
+  field.onblur = () => setTimeout(commit, 120);
+}
+
+async function checkFollows(){
+  const btn = $('btnFollowCheck');
+  if(!followUsers.length){ setFollowHint('关注列表还是空的，先在上面的主页里点「☆ 关注此人」。'); return; }
+  const count = Math.min(followUsers.length, 20);
+  btn.disabled = true;
+  btn.textContent = '检查中…';
+  setFollowHint('正在逐个检查 ' + count + ' 个用户 —— 每个都要请求一次抖音接口，请稍候…');
+
+  try{
+    const res = await fetch(API_BASE + '/api/follows/check', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({limit: 20})
+    });
+    const json = await res.json();
+    await loadFollows();
+
+    const updates = json.updates || [];
+    const totalNew = updates.reduce((sum, u) => sum + (u.new_count || 0), 0);
+    let msg = '检查完成：' + (json.checked || 0) + ' 个用户，' +
+      (totalNew ? '共发现 ' + totalNew + ' 条新作品（角标已更新）' : '暂时没有新作品');
+    const errors = json.errors || [];
+    if(errors.length){
+      msg += '；' + errors.length + ' 个检查失败：' + (errors[0].error || '未知原因');
+    }
+    setFollowHint(msg);
+  }catch(e){
+    setFollowHint('检查失败：' + e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '检查更新';
+  }
+}
+
+/* ---- 用户卡片的事件绑定（一次） ---- */
+$('uGrid').addEventListener('click', ev => {
+  const card = ev.target.closest('.pcard');
+  if(!card) return;
+  const index = parseInt(card.dataset.idx, 10);
+  if(isNaN(index)) return;
+  if(ev.target.closest('.ck')){ togglePick(index); return; }
+  openPost(index);
+});
+
+$('uTools').addEventListener('click', ev => {
+  const hit = ev.target.closest('[data-act]');
+  if(!hit || !userState) return;
+  const act = hit.dataset.act;
+  if(act === 'all'){
+    userState.posts.forEach((_, i) => userState.picked.add(i));
+    renderUserGrid(); renderUserTools();
+    return;
+  }
+  if(act === 'none'){
+    userState.picked.clear();
+    renderUserGrid(); renderUserTools();
+    return;
+  }
+  if(act === 'dl-picked'){
+    const picked = Array.from(userState.picked).sort((a, b) => a - b).map(i => userState.posts[i]);
+    downloadPosts(picked);
+    return;
+  }
+  if(act === 'dl-all'){
+    (async () => {
+      if(userState.hasMore){ await loadMoreUser(true); }
+      downloadPosts(userState.posts.slice());
+    })();
+  }
+});
+
+$('btnUserMore').onclick = () => loadMoreUser(false);
+$('btnUserAll').onclick = () => loadMoreUser(true);
+$('btnFollowCheck').onclick = checkFollows;
+
+$('followList').addEventListener('click', ev => {
+  const unfollowBtn = ev.target.closest('[data-unfollow]');
+  if(unfollowBtn){
+    ev.stopPropagation();
+    const sec = unfollowBtn.dataset.unfollow;
+    if(unfollowArmed !== sec){
+      unfollowArmed = sec;
+      unfollowBtn.textContent = '确认？';
+      unfollowBtn.style.width = 'auto';
+      setTimeout(() => { if(unfollowArmed === sec){ unfollowArmed = ''; loadFollows(); } }, 4000);
+      return;
+    }
+    unfollowArmed = '';
+    fetch(API_BASE + '/api/follows/delete', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sec_uid: sec})
+    }).then(() => loadFollows()).catch(() => {});
+    return;
+  }
+
+  const noteBtn = ev.target.closest('[data-note]');
+  if(noteBtn){
+    ev.stopPropagation();
+    const item = noteBtn.closest('.fl-item');
+    if(item) editNote(item, noteBtn.dataset.note);
+    return;
+  }
+
+  const item = ev.target.closest('.fl-item');
+  if(item && item.dataset.sec) openFollowedUser(item.dataset.sec);
+});
+
 /* ---------------- B站 账号设置（SESSDATA / cookies） ---------------- */
 
 /* 面板内的提示统一走这个容器，不用 alert —— 弹窗会打断「粘贴→保存→重解析」的操作流，
@@ -2149,6 +2970,15 @@ input.addEventListener('input', () => {
 });
 
 btnParse.onclick = doParse;
+
+// 解析结果里的作者名 → 打开 TA 的全部作品。
+// 用事件委托：作者区每次渲染都会重建 innerHTML，逐个绑会丢。
+$('author').addEventListener('click', ev => {
+  const link = ev.target.closest('[data-author]');
+  if(!link) return;
+  ev.preventDefault();
+  openAuthor(link.dataset.platform, link.dataset.author);
+});
 btnClear.onclick = () => {
   input.value = ''; hideError(); result.style.display = 'none'; input.focus();
 };
@@ -2191,6 +3021,12 @@ setPlatform('douyin');
 loadHistory();
 // 未配置时这次调用不触发任何 B站 请求，配置过才会探一次 nav 用于点亮绿点
 loadCfgStatus();
+// 关注列表：服务没起来时静默失败，不打扰首屏
+loadFollows();
+// 刷新/重开页面后，把还在跑或刚跑完的下载任务重新挂到右下角面板上。
+// /api/save/list 这个接口存在的意义就是这个；没有这一步，用户一刷新就只剩
+// "文件在下载目录里自己长"，看不到任何进度。无任务时它会在 15 秒内自动停表。
+saveWatch();
 </script>
 </body>
 </html>

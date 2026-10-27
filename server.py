@@ -50,12 +50,14 @@ import bili_parser
 import dash_muxer
 import disk_saver
 import douyin_parser
+import douyin_user
 import runtime_paths
 import tiktok_parser
 import xhs_parser
 from bili_parser import BiliError
 from bili_parser import parse as bili_parse
 from douyin_parser import ParseError, parse as douyin_parse
+from douyin_user import UserError as DouyinUserError
 from tiktok_parser import TikTokError
 from tiktok_parser import parse as tiktok_parse
 from xhs_parser import XHSError
@@ -801,6 +803,311 @@ def _parse_xiaohongshu(text: str):
     if data.get("cover"):
         data["cover_proxy"] = "/api/proxy?url=" + quote(data["cover"], safe="")
     return {"success": True, "platform": "xiaohongshu", "data": data}
+
+
+# ---------------------------------------------------------------- 用户主页 / 关注列表
+# 「记住用户」这条链路：粘贴作者主页链接 -> 该用户全部作品 -> 勾选下载 -> 存成关注。
+#
+# 与 /api/parse 的分工要说清楚，否则两边会各写一套重复逻辑：
+#   · 单条作品仍走 /api/parse（高清多档 / 图集 / 实况照片 / 来源标记全在那边）
+#   · 这里只负责「列出这个人发过什么」。主页列表接口自带 `bit_rate` 多档，
+#     因此列表里的每一条都能直接下载；只有需要「实况照片动态段」这类
+#     详情专属字段时，才回退到 /api/parse。
+#
+# 平台范围：只做抖音。TikTok 的 /api/post/item_list/ 不带 X-Bogus 时返回
+# HTTP 200 + 空 body，主页 SSR 的 itemList 也是空数组（2026-10-27 实测），
+# 要支持得引入整套 JS 签名算法 —— 不在本期范围内，接口直接给出明确说明。
+
+
+class UserParseRequest(BaseModel):
+    text: str = ""
+    #: 游标。首屏留空（等价 "0"），续页传上一页返回的 cursor
+    cursor: str = ""
+    #: 0 = 用后端默认页大小（18）
+    count: int = 0
+    #: 一次翻几页。1 = 只取首屏；「加载全部」由前端递增调用
+    pages: int = 1
+
+
+class UserMoreRequest(BaseModel):
+    sec_uid: str
+    platform: str = "douyin"
+    cursor: str = ""
+    count: int = 0
+
+
+class FollowRequest(BaseModel):
+    user: Dict[str, Any]
+
+
+class FollowDeleteRequest(BaseModel):
+    sec_uid: str
+
+
+class FollowNoteRequest(BaseModel):
+    sec_uid: str
+    note: str = ""
+
+
+class FollowCheckRequest(BaseModel):
+    #: 空 = 检查全部关注
+    sec_uids: Optional[List[str]] = None
+    #: 单次最多检查多少个（每个用户要打一次带签名的接口，太慢会超时）
+    limit: int = 20
+
+
+#: 明确**不支持**主页列表的平台（抖音 / B站 是支持的，不在此表）
+USER_PLATFORM_HINT = {
+    "tiktok": "TikTok",
+    "xiaohongshu": "小红书",
+}
+
+
+def _user_platform(text: str) -> str:
+    """这条内容属于哪个平台的「用户主页」；不是主页或平台不支持时返回空串。
+
+    判定顺序有讲究：先按域名认出平台，再看形态。否则 `bilibili.com/video/BVxxx`
+    会被当成 B站 主页去请求空间接口，报一句牛头不对马嘴的错。
+    """
+    platform = detect_platform(text)
+    if platform == "bilibili":
+        return "bilibili" if bili_parser.looks_like_space(text) else ""
+    if platform in USER_PLATFORM_HINT:
+        return ""
+    if douyin_user.looks_like_user(text):
+        return "douyin"
+    # 纯数字（且不像作品 id）默认按 B站 mid 理解 —— 抖音的 sec_uid 一定带 MS4w 前缀
+    if bili_parser.looks_like_space(text) and not detect_platform(text):
+        return "bilibili"
+    return ""
+
+
+def _user_reject(text: str):
+    """不是用户主页时，按平台给出**能直接照做**的提示。"""
+    platform = detect_platform(text)
+    if platform in USER_PLATFORM_HINT:
+        name = USER_PLATFORM_HINT[platform]
+        return _error(
+            "用户主页的作品列表目前支持抖音与 B站。%s 的主页列表接口需要额外签名"
+            "（TikTok 实测「HTTP 200 但返回空 body」），单条作品解析不受影响 —— "
+            "把某一条作品的链接粘进来照常能下载。" % name,
+            platform,
+        )
+    if platform == "bilibili":
+        return _error(
+            "这是一条 B站 视频链接，不是 UP 主主页。想看 TA 的全部作品，"
+            "请点解析结果里的作者名，或打开 TA 的个人空间复制地址栏链接"
+            "（形如 https://space.bilibili.com/546195）。",
+            "bilibili",
+        )
+    if platform == "douyin":
+        return _error(
+            "这看起来是单个抖音作品，不是作者主页。想看 TA 的全部作品，"
+            "请点解析结果里的作者名，或打开作者主页复制地址栏链接"
+            "（含 /user/MS4wLjABAAAA...）。",
+            "douyin",
+        )
+    return _error(
+        "没认出这是谁的主页。支持两种链接："
+        "抖音 https://www.douyin.com/user/MS4wLjABAAAA... 或 "
+        "B站 https://space.bilibili.com/546195 。",
+        platform,
+    )
+
+
+@app.post("/api/user/parse")
+def api_user_parse(req: UserParseRequest):
+    """解析用户主页：资料 + 首屏作品列表。抖音与 B站 共用这一个入口。"""
+    text = (req.text or "").strip()
+    platform = _user_platform(text)
+    if not platform:
+        return _user_reject(text)
+
+    try:
+        if platform == "bilibili":
+            data = bili_parser.parse_space(
+                text,
+                pn=max(1, int(req.cursor or 1)),
+                pages=max(1, int(req.pages or 1)),
+            )
+        else:
+            data = douyin_user.parse_user(
+                text,
+                cursor=req.cursor,
+                count=req.count or douyin_user.PAGE_SIZE,
+                pages=max(1, int(req.pages or 1)),
+            )
+    except (DouyinUserError, BiliError) as exc:
+        return _error(str(exc), platform)
+    except Exception as exc:  # 兜底，避免把堆栈甩给前端
+        return _error("解析用户主页异常：%s: %s" % (type(exc).__name__, exc), platform)
+
+    sec_uid = (data.get("user") or {}).get("sec_uid") or ""
+    saved = douyin_user.STORE.find(sec_uid) if sec_uid else None
+    data["followed"] = bool(saved)
+    data["note"] = (saved or {}).get("note", "")
+
+    if saved:
+        # 「打开主页」这个动作本身就是「看过了」：把首条记为基线、清掉新作品角标。
+        # 两件事都是本机 JSON 写，失败不该影响解析结果。
+        try:
+            if data["posts"]:
+                douyin_user.STORE.record_first_post(sec_uid, data["posts"][0]["aweme_id"])
+            douyin_user.STORE.mark_checked(sec_uid, data["user"])
+        except OSError:
+            pass
+
+    result = {"success": True, "platform": platform, "data": data}
+    _remember_media_hosts(result)
+    return result
+
+
+@app.post("/api/user/more")
+def api_user_more(req: UserMoreRequest):
+    """用户主页续页（「加载更多」）。抖音走游标，B站 走页码。"""
+    sec_uid = (req.sec_uid or "").strip()
+    if not sec_uid:
+        return _error("缺少用户 ID，无法继续加载")
+    platform = (req.platform or "douyin").strip().lower()
+
+    try:
+        if platform == "bilibili":
+            page = bili_parser.fetch_space_videos(sec_uid, int(req.cursor or 1))
+        else:
+            page = douyin_user.fetch_posts(
+                sec_uid, req.cursor, req.count or douyin_user.PAGE_SIZE
+            )
+    except (DouyinUserError, BiliError) as exc:
+        return _error(str(exc), platform)
+    except Exception as exc:
+        return _error("加载更多失败：%s: %s" % (type(exc).__name__, exc), platform)
+
+    result = {"success": True, "platform": platform, "data": page}
+    _remember_media_hosts(result)
+    return result
+
+
+@app.get("/api/follows")
+def api_follows_list():
+    """关注列表（按添加时间倒序）。"""
+    return {
+        "users": douyin_user.STORE.listing(),
+        "limit": douyin_user.FOLLOW_LIMIT,
+        "path": douyin_user.STORE.path,
+    }
+
+
+@app.post("/api/follows")
+def api_follows_save(req: FollowRequest):
+    """把当前解析出的用户存进关注列表（已存在则更新资料，不重复添加）。"""
+    try:
+        record = douyin_user.STORE.upsert(dict(req.user or {}))
+    except DouyinUserError as exc:
+        return _error(str(exc))
+    except Exception as exc:
+        return _error("保存关注失败：%s: %s" % (type(exc).__name__, exc))
+    return {"success": True, "user": record, "total": len(douyin_user.STORE.listing())}
+
+
+@app.post("/api/follows/delete")
+def api_follows_delete(req: FollowDeleteRequest):
+    """取消关注。"""
+    removed = douyin_user.STORE.remove((req.sec_uid or "").strip())
+    return {
+        "success": removed,
+        "total": len(douyin_user.STORE.listing()),
+        "error": "" if removed else "该用户不在关注列表中",
+    }
+
+
+@app.post("/api/follows/note")
+def api_follows_note(req: FollowNoteRequest):
+    """给关注的人加一句备注（比如「苏州探店」）。"""
+    ok = douyin_user.STORE.set_note((req.sec_uid or "").strip(), req.note)
+    return {"success": ok, "error": "" if ok else "该用户不在关注列表中"}
+
+
+def _user_page_ids(platform: str, sec_uid: str) -> List[Dict[str, Any]]:
+    """取某个关注用户「第一页」的作品标识，供检查更新用。
+
+    两个平台的分页口径不同（抖音是游标、B站 是页码），但检查更新只关心
+    「最新的若干条 id 顺序」，所以这里统一返回 [{id, title}]。
+    """
+    if platform == "bilibili":
+        page = bili_parser.fetch_space_videos(sec_uid, 1)
+    else:
+        page = douyin_user.fetch_posts(sec_uid, "0", douyin_user.PAGE_SIZE)
+    return [
+        {"id": str(p.get("aweme_id") or ""), "title": p.get("title") or ""}
+        for p in (page.get("posts") or [])
+        if p.get("aweme_id")
+    ]
+
+
+@app.post("/api/follows/check")
+def api_follows_check(req: FollowCheckRequest):
+    """检查关注的人有没有新作品。
+
+    每个用户要打一次列表接口（B站 还要额外拿签名/名片），所以串行 + 限制条数；
+    单个失败不中断整批。
+    `overflow` 表示「基线作品已经掉出第一页」，此时只能给出下限（第一页条数）。
+    """
+    users = douyin_user.STORE.listing()
+    if req.sec_uids:
+        wanted = {str(x) for x in req.sec_uids}
+        users = [u for u in users if u.get("sec_uid") in wanted]
+    limit = max(1, min(int(req.limit or 20), 50))
+    users = users[:limit]
+
+    updates: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = []
+
+    for user in users:
+        sec_uid = user.get("sec_uid") or ""
+        if not sec_uid:
+            continue
+        platform = (user.get("platform") or "douyin").strip().lower()
+        try:
+            items = _user_page_ids(platform, sec_uid)
+        except Exception as exc:  # noqa: BLE001 - 单人失败不能拖垮整批
+            errors.append({
+                "sec_uid": sec_uid,
+                "nickname": user.get("nickname") or "",
+                "error": str(exc),
+            })
+            continue
+
+        ids = [item["id"] for item in items]
+        last = (user.get("last_aweme_id") or "").strip()
+        overflow = False
+        if not last:
+            new_count = 0
+        elif last in ids:
+            new_count = ids.index(last)
+        else:
+            new_count = len(ids)
+            overflow = True
+
+        try:
+            douyin_user.STORE.set_new_count(sec_uid, new_count)
+        except OSError:
+            pass
+
+        updates.append({
+            "sec_uid": sec_uid,
+            "nickname": user.get("nickname") or "",
+            "new_count": new_count,
+            "overflow": overflow,
+            "total_seen": len(items),
+            "latest": items[0]["title"] if items else "",
+        })
+
+    return {
+        "success": True,
+        "updates": updates,
+        "errors": errors,
+        "checked": len(users),
+    }
 
 
 def _upstream_detail(url: str, platform: str, status: int,
