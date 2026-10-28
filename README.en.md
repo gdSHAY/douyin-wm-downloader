@@ -90,10 +90,10 @@ Top half: a Bilibili video. Bottom half: the same creator's page — followers, 
 <br>
 
 <div align="center">
-<img src="./docs/screenshot-follow-zh.png" width="880" alt="Work grid and follow list">
+<img src="./docs/screenshot-follow-zh.png" width="880" alt="Follow list with platform badges and filters">
 <br>
-<sub>The grid supports selecting several works for batch download; the "creators I follow" card<br>
-remembers them and a "check for updates" pass badges any account with new works ("N new")</sub>
+<sub>"Creators I follow" — every entry carries a <b>platform badge on the avatar</b> (Douyin = music note, Bilibili = TV set),<br>
+with an <code>all / Douyin / Bilibili</code> filter row on top; new works are badged "N new"</sub>
 </div>
 
 | Capability | Douyin | Bilibili |
@@ -102,6 +102,11 @@ remembers them and a "check for updates" pass badges any account with new works 
 | Batch download (selected) | ✅ queued server-side, survives page close | — |
 | Single work download | ✅ multiple quality tiers | ✅ open the card, server-side ffmpeg mux |
 | Save to follow list / new-work badge | ✅ | ✅ |
+
+**Every follow entry is tagged with its source platform** — a small badge on the avatar's
+bottom-right corner (Douyin = music note, Bilibili = TV set), plus an `全部 / 抖音 / B站`
+filter row above the cards that only lists platforms you actually follow. Douyin accounts
+show `@handle`, Bilibili accounts show `UID`, so the two never get confused.
 
 > **Why Bilibili has no batch download**: Bilibili serves DASH with **separate video and audio
 > tracks**, so every file must be muxed by ffmpeg on the server. Faking a batch button would
@@ -122,7 +127,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.12-win64.zip` (≈ 73 MB, ≈ 166 MB unpacked) |
+| File | `multipldl-1.0.13-win64.zip` (≈ 73 MB, ≈ 166 MB unpacked) |
 | Dependencies | **None** — Python 3.13 and ffmpeg are bundled |
 
 1. **Extract the whole folder** (⚠️ do *not* drag the `.exe` out on its own — `_internal/` is part of it)
@@ -135,7 +140,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.12-arm64-v8a-debug.apk` (23.9 MB) |
+| File | `multipldl-1.0.13-arm64-v8a-debug.apk` (23.9 MB) |
 | ABI | `arm64-v8a` (virtually every phone since 2017) |
 | Signing | **debug-signed** — you must allow installs from unknown sources; no release signing yet |
 

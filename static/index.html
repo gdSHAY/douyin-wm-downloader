@@ -323,6 +323,36 @@
     display:flex;align-items:center;gap:6px;
   }
   .fl-sub{font-size:11.5px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+
+  /* 头像 + 平台徽标。
+     关注列表里抖音号和 B站 UP 主混在一起，只靠昵称完全分不出谁是谁 ——
+     在头像右下角压一枚平台图标，扫一眼就能认。 */
+  .fl-avatar{position:relative;flex:0 0 auto;width:38px;height:38px}
+  .fl-avatar img{width:38px;height:38px;border-radius:50%;object-fit:cover;background:#eef0f3;display:block}
+  .fl-plat{
+    position:absolute;right:-4px;bottom:-4px;width:17px;height:17px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    border:2px solid var(--card);box-sizing:content-box;color:#fff;
+  }
+  .fl-plat svg{width:11px;height:11px;display:block}
+  .fl-plat.douyin{background:#0f1113}
+  .fl-plat.bilibili{background:#00a1d6}
+  .fl-plat.other{background:#8b93a1}
+
+  /* 平台筛选栏：只列「真的有人」的平台，不放一堆 0 */
+  .follow-filters{display:flex;gap:7px;flex-wrap:wrap;margin:-2px 0 11px}
+  .ff{
+    display:inline-flex;align-items:center;gap:5px;
+    background:#f1f2f4;color:var(--text-2);border:1px solid transparent;
+    border-radius:999px;padding:4px 11px;font:inherit;font-size:12px;font-weight:600;line-height:1.4;
+    cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+  }
+  .ff:hover{background:#e8eaed;color:var(--text)}
+  .ff.on{background:#fff;color:var(--brand);border-color:var(--brand)}
+  .ff i{font-style:normal;font-weight:600;font-size:11px;opacity:.7}
+  .ff.on i{opacity:1}
+  .ff .ff-ico{display:block;width:12px;height:12px}
+  .ff .ff-ico svg{width:12px;height:12px;display:block}
   .fl-ops{display:flex;gap:5px;flex:0 0 auto}
   .fl-badge{
     background:var(--brand);color:#fff;font-size:10.5px;font-weight:700;
@@ -510,6 +540,7 @@
       <h3>我关注的用户 <span id="followCount"></span></h3>
       <button class="btn-mini" id="btnFollowCheck">检查更新</button>
     </div>
+    <div class="follow-filters" id="followFilters"></div>
     <div class="follow-list" id="followList"></div>
     <div class="hint" id="followHint"></div>
   </div>
@@ -2075,6 +2106,8 @@ let userState = null;       // {user, posts, cursor, hasMore, followed, note, pi
 let userBusy = false;       // 解析 / 续页 互斥
 let userDownloading = false;
 let followUsers = [];
+let followLimit = 300;      // 后端给的上限，用于标题上的「2 / 300」
+let followFilter = 'all';   // 关注列表的平台筛选：all / douyin / bilibili
 let unfollowArmed = '';     // 二次确认：记住「已经点过一次取消」的 sec_uid
 
 /* 是否为「用户主页」链接。
@@ -2498,32 +2531,117 @@ async function loadFollows(){
   }
 }
 
+/* 平台徽标：内联 SVG，不引外部图标库 —— 整套前端是单文件、双击即可打开，
+   多一个 CDN 依赖就多一种「断网就白块」的失败模式。
+   图形用最易辨认的特征：抖音=音符，B站=小电视。 */
+const PLATFORM_BADGE = {
+  douyin: {
+    label: '抖音',
+    cls: 'douyin',
+    icon: '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">' +
+          '<ellipse cx="4.9" cy="11.2" rx="2.8" ry="2.35"/>' +
+          '<rect x="6.9" y="2.2" width="2.1" height="9.3" rx="0.4"/>' +
+          '<path d="M9 2.2c0 1.5 1 2.5 2.3 2.9.5.16 1 .2 1 .2V3.5c-1.4-.4-2.3-1.3-2.3-1.3z"/>' +
+          '</svg>'
+  },
+  bilibili: {
+    label: 'B站',
+    cls: 'bilibili',
+    icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" ' +
+          'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<rect x="1.8" y="4.6" width="12.4" height="8.6" rx="2.2"/>' +
+          '<path d="M4.9 2.2 6.7 4M11.1 2.2 9.3 4"/>' +
+          '<circle cx="5.9" cy="8.9" r="0.85" fill="currentColor" stroke="none"/>' +
+          '<circle cx="10.1" cy="8.9" r="0.85" fill="currentColor" stroke="none"/>' +
+          '</svg>'
+  }
+};
+
+function platformMeta(platformName){
+  const key = (platformName || 'douyin').toLowerCase();
+  return PLATFORM_BADGE[key] || { label: key || '?', cls: 'other', icon: '' };
+}
+
+/** 头像右下角那枚平台图标（title 里写平台全名，鼠标悬停也能确认）。 */
+function platformBadge(platformName){
+  const meta = platformMeta(platformName);
+  return '<i class="fl-plat ' + meta.cls + '" title="' + escapeHtml(meta.label) + '">' +
+    meta.icon + '</i>';
+}
+
+function platformLabel(platformName){
+  return platformMeta(platformName).label;
+}
+
 function renderFollows(data){
   // 以参数为准并回写到模块状态：调用方（loadFollows）拿到的是最新数据，
   // 让函数自己记住它，避免"传了 A 却渲染 B"这类只会在改动后暴露的错位。
   if(data && Array.isArray(data.users)) followUsers = data.users;
+  if(data && data.limit) followLimit = data.limit;
 
   const card = $('followCard');
   if(!followUsers.length){
     card.style.display = 'none';
     $('followList').innerHTML = '';
+    $('followFilters').innerHTML = '';
     return;
   }
   card.style.display = 'block';
-  $('followCount').textContent = '（' + followUsers.length + ' / ' + ((data && data.limit) || 300) + '）';
+  $('followCount').textContent = '（' + followUsers.length + ' / ' + followLimit + '）';
 
-  $('followList').innerHTML = followUsers.map(u => {
+  // ---- 平台筛选栏
+  // 只列「真的关注了人」的平台：一屏都是 0 的按钮除了碍眼没有别的用处。
+  const counts = { all: followUsers.length };
+  followUsers.forEach(u => {
+    const key = (u.platform || 'douyin').toLowerCase();
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  // 当前筛选的平台被取消关注到 0 人时，自动退回「全部」——
+  // 否则会停在一个空列表上，看起来像是关注记录丢了。
+  if(followFilter !== 'all' && !counts[followFilter]) followFilter = 'all';
+
+  const keys = ['all'].concat(Object.keys(counts).filter(k => k !== 'all'));
+  $('followFilters').innerHTML = keys.map(key => {
+    const isAll = key === 'all';
+    const meta = platformMeta(key);
+    const ico = isAll ? '' : '<span class="ff-ico">' + meta.icon + '</span>';
+    return '<button class="ff' + (followFilter === key ? ' on' : '') + '"' +
+      ' data-fp="' + escapeHtml(key) + '">' + ico +
+      escapeHtml(isAll ? '全部' : meta.label) +
+      ' <i>' + counts[key] + '</i></button>';
+  }).join('');
+
+  const shown = followFilter === 'all'
+    ? followUsers
+    : followUsers.filter(u => (u.platform || 'douyin').toLowerCase() === followFilter);
+
+  if(!shown.length){
+    $('followList').innerHTML =
+      '<div class="hint" style="grid-column:1 / -1;margin:2px 0 0">这个平台下还没有关注的号。</div>';
+    return;
+  }
+
+  $('followList').innerHTML = shown.map(u => {
     const sec = escapeHtml(u.sec_uid || '');
+    const plat = (u.platform || 'douyin').toLowerCase();
     const badge = u.new_count
       ? '<span class="fl-badge">' + (u.new_count >= 18 ? '18+' : u.new_count) + ' 新</span>'
       : '';
+    // 两个平台的「账号标识」不是同一个东西：抖音是 @unique_id，B站 只有数字 UID。
+    // 原先统一写 `@unique_id`，B站 用户就显示成「@—」，看着像数据没取到。
+    const handle = plat === 'bilibili'
+      ? 'UID ' + (u.sec_uid || '—')
+      : '@' + (u.unique_id || u.uid || '—');
     const sub = u.note
       ? '<span class="fl-note" title="' + escapeHtml(u.note) + '">' + escapeHtml(u.note) + '</span>'
-      : escapeHtml('@' + (u.unique_id || '—') + ' · ' + fmt(u.follower_count) + ' 粉丝');
+      : escapeHtml(handle + ' · ' + fmt(u.follower_count) + ' 粉丝');
     return '<div class="fl-item" data-sec="' + sec + '">' +
-      (u.avatar ? '<img src="' + proxy(u.avatar) + '" loading="lazy" alt="">' : '<img alt="">') +
+      '<span class="fl-avatar">' +
+        (u.avatar ? '<img src="' + proxy(u.avatar) + '" loading="lazy" alt="">' : '<img alt="">') +
+        platformBadge(plat) +
+      '</span>' +
       '<div class="fl-main">' +
-        '<div class="fl-name">' + escapeHtml(u.nickname || '抖音用户') + badge + '</div>' +
+        '<div class="fl-name">' + escapeHtml(u.nickname || platformLabel(plat) + '用户') + badge + '</div>' +
         '<div class="fl-sub">' + sub + '</div>' +
       '</div>' +
       '<div class="fl-ops">' +
@@ -2609,6 +2727,16 @@ async function checkFollows(){
 }
 
 /* ---- 用户卡片的事件绑定（一次） ---- */
+// 关注列表的平台筛选。用事件委托：筛选栏每次渲染都会重建 innerHTML。
+$('followFilters').addEventListener('click', ev => {
+  const pill = ev.target.closest('[data-fp]');
+  if(!pill) return;
+  const next = pill.dataset.fp || 'all';
+  if(next === followFilter) return;
+  followFilter = next;
+  renderFollows();   // 只重渲染，不重新请求后端
+});
+
 $('uGrid').addEventListener('click', ev => {
   const card = ev.target.closest('.pcard');
   if(!card) return;
