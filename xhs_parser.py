@@ -161,6 +161,53 @@ def _get(url: str, session=None, allow_redirects: bool = True, timeout: int = 25
                        timeout=timeout)
 
 
+# ---- 双通道：curl_cffi 与 plain requests ----------------------------------
+# ★ 2026-10-29 实测：小红书改了口径，把「impersonate=chrome」的请求判为人机验证，
+#   短链跟随直接落到 https://www.xiaohongshu.com/website-login/captcha?redirectPa...
+#   （HTTP 200，但页面里没有 window.__INITIAL_STATE__），于是解析报
+#   「页面里没找到内嵌数据」。**同一时刻、同一 UA** 换成普通 requests（HTTP/1.1 +
+#   OpenSSL 指纹）反而正常：落地 /discovery/item/<id>?xsec_token=…，95 KB、含完整状态。
+#   所以这里保留两条通道：先 curl_cffi（历史上它能过 TLS 校验），一旦被判成验证页
+#   就记下来、本进程后续直接走 plain，避免每条链接都白跑一次验证页。
+_CAPTCHA_HINTS = ("website-login/captcha", "/website-login/", "captcha")
+
+#: 本进程内 curl_cffi 已被判过人机验证 —— 后续请求直接走 plain requests
+_CURL_BLOCKED = False
+
+
+def _is_captcha(url: str) -> bool:
+    """落地页是不是小红书的人机验证页。"""
+    lowered = (url or "").lower()
+    return any(hint in lowered for hint in _CAPTCHA_HINTS)
+
+
+def _get_plain(url: str, allow_redirects: bool = True, timeout: int = 25):
+    """普通 requests（trust_env 默认开启，会沿用系统代理）。"""
+    return _plain_requests.Session().get(
+        url, headers=HEADERS, allow_redirects=allow_redirects, timeout=timeout
+    )
+
+
+def _get_page(url: str, allow_redirects: bool = True, timeout: int = 25):
+    """取页面：优先 curl_cffi，被送去验证页时自动改走 plain requests。
+
+    失败也要降级：实测 curl_cffi 偶发 `curl: (28)` 连不上，而同一时刻 plain
+    requests 正常 —— 所以「连不上」只对本次生效，不写入 `_CURL_BLOCKED`；
+    只有**确定拿到验证页**（可复现的信号）才记忆，避免误伤。
+    """
+    global _CURL_BLOCKED
+    if _HAS_CURL_CFFI and not _CURL_BLOCKED:
+        try:
+            resp = _get(url, allow_redirects=allow_redirects, timeout=timeout)
+        except Exception:
+            return _get_plain(url, allow_redirects=allow_redirects, timeout=timeout)
+        if _is_captcha(str(getattr(resp, "url", "") or "")):
+            _CURL_BLOCKED = True
+        else:
+            return resp
+    return _get_plain(url, allow_redirects=allow_redirects, timeout=timeout)
+
+
 # --------------------------------------------------------------------------
 # 链接处理
 # --------------------------------------------------------------------------
@@ -227,7 +274,7 @@ def resolve_short_link(url: str) -> Tuple[str, str]:
         return url, ""
 
     try:
-        resp = _get(url)
+        resp = _get_page(url)
     except Exception as exc:
         raise XHSError(f"短链还原失败（网络问题）：{exc}") from exc
 
@@ -390,23 +437,49 @@ def fetch_note(url: str, note_id: str = "") -> Tuple[dict, str]:
         note_id = extract_note_id(final_url)
 
     try:
-        resp = _get(resolve_target)
+        resp = _get_page(resolve_target)
     except Exception as exc:
         raise XHSError(f"请求小红书失败（网络问题，重点看代理是否影响国内站点）：{exc}") from exc
 
     html = resp.text or ""
+    used_url = str(resp.url or resolve_target)
     state = extract_initial_state(html)
+
+    # 第二枪：万一第一条通道拿回的是「没有内嵌数据的空壳页」（状态码 200 但没有
+    # __INITIAL_STATE__），强制用 plain requests 再取一次。实测这正是当前
+    # 小红书风控的表现形式，而 plain 通道能拿到完整页面。
     if state is None:
-        # 有时会落到登录页或验证页
+        try:
+            alt = _get_plain(used_url)
+            alt_html = alt.text or ""
+            alt_state = extract_initial_state(alt_html)
+            if alt_state is not None:
+                html, state, resp = alt_html, alt_state, alt
+                used_url = str(alt.url or used_url)
+        except Exception:
+            pass
+
+    if state is None:
+        # 三种失败要分开说，否则用户只能看到一个笼统的「风控拦截」
+        if _is_captcha(used_url):
+            raise XHSError(
+                "小红书把这次请求判成了人机验证（页面跳到了验证码页），没取到笔记数据。"
+                "稍等几十秒再试一次通常就能过；一直这样的话，换一条刚复制的分享链接，"
+                "或者暂时关掉代理再试（国内站点走代理更容易被判定为异常）。"
+            )
         if "登录" in html and "noteDetailMap" not in html:
             raise XHSError(
                 "小红书要求登录后才返回数据（可能触发了风控）。"
                 "请稍后重试，或换一条新复制的分享链接。"
             )
-        raise XHSError("页面里没找到内嵌数据（__INITIAL_STATE__），可能被风控拦截。")
+        raise XHSError(
+            "页面里没找到内嵌数据（__INITIAL_STATE__），可能被风控拦截。"
+            "本次返回 %d 字节、落地在 %s —— 稍后重试或换一条新复制的分享链接。"
+            % (len(html), used_url.split("?")[0][:80])
+        )
 
     note = pick_note(state, note_id)
-    return note, str(resp.url or resolve_target)
+    return note, used_url
 
 
 # --------------------------------------------------------------------------

@@ -33,6 +33,12 @@ The UI is a web page, but the **server runs on your own machine** (`127.0.0.1`).
 > **Bilibili needs ffmpeg for a playable "finished" file** (bundled in the Windows build);
 > **Xiaohongshu requires the full link from Share → Copy Link in the app.**
 
+> 🔧 **Fixed in 1.0.14**: Xiaohongshu parsing failed with "no embedded data found". The platform
+> began sending Chrome-fingerprinted requests to a human-verification page, while plain HTTP
+> requests still returned the real note page. The parser now switches between both channels
+> automatically and remembers which one is blocked. The Android build never shipped the
+> fingerprinted channel, so it was unaffected.
+
 ## 🎬 What it looks like
 
 <div align="center">
@@ -127,7 +133,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.13-win64.zip` (≈ 73 MB, ≈ 166 MB unpacked) |
+| File | `multipldl-1.0.14-win64.zip` (≈ 73 MB, ≈ 166 MB unpacked) |
 | Dependencies | **None** — Python 3.13 and ffmpeg are bundled |
 
 1. **Extract the whole folder** (⚠️ do *not* drag the `.exe` out on its own — `_internal/` is part of it)
@@ -140,7 +146,7 @@ Grab a build from the [**Releases**](../../releases/latest) page. Both bundles *
 
 | | |
 | --- | --- |
-| File | `multipldl-1.0.13-arm64-v8a-debug.apk` (23.9 MB) |
+| File | `multipldl-1.0.14-arm64-v8a-debug.apk` (23.9 MB) |
 | ABI | `arm64-v8a` (virtually every phone since 2017) |
 | Signing | **debug-signed** — you must allow installs from unknown sources; no release signing yet |
 
